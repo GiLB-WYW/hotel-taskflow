@@ -255,9 +255,16 @@ export default function CreateTask() {
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Location</label>
-                      <div className="p-2 bg-muted/30 rounded-md border border-border font-medium text-sm">
-                        {LOCATIONS.find(l => l.id === formData.locationId)?.name || "Select Location"}
-                      </div>
+                      <select 
+                        className="w-full p-2 bg-background rounded-md border border-border font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                        value={formData.locationId}
+                        onChange={(e) => setFormData({...formData, locationId: e.target.value})}
+                      >
+                        <option value="">-- Select Location --</option>
+                        {LOCATIONS.map(loc => (
+                          <option key={loc.id} value={loc.id}>{loc.name} ({loc.category})</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Priority</label>
