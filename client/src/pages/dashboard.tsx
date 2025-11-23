@@ -16,10 +16,20 @@ export default function Dashboard() {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [, setLocation] = useLocation();
 
-  // Filter Logic
+  // Filter Logic with Smart Search
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const location = LOCATIONS.find(l => l.id === task.locationId);
+    
+    // Smart search: match title, description, location name, location code
+    const matchesSearch = 
+      task.title.toLowerCase().includes(searchLower) || 
+      task.description.toLowerCase().includes(searchLower) ||
+      (location?.name.toLowerCase().includes(searchLower)) ||
+      (location?.id.toLowerCase().includes(searchLower)) ||
+      // Also match just the room/location code (e.g., "C2" from "Suite C2")
+      (location?.name.split(/\s+/).some(word => word.toLowerCase().includes(searchLower)));
+    
     const matchesStatus = statusFilter === "All" || task.status === statusFilter;
     const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
     

@@ -141,7 +141,11 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
               <Bell className="h-4 w-4" />
               <span>Notifications</span>
             </Button>
-            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 lg:gap-2">
+            <Button 
+              size="sm" 
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 lg:gap-2"
+              onClick={() => setLocation("/create-task")}
+            >
               <PlusCircle className="h-4 w-4" />
               <span className="hidden lg:inline">New Task</span>
             </Button>

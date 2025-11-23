@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LOCATIONS, USERS, MAINTENANCE_GROUPS } from "@/lib/mockData";
 import { Plus, Trash2, Edit, Search, UserPlus, MapPin, Wrench } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("locations");
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   const filteredLocations = LOCATIONS.filter(l => 
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -54,7 +56,13 @@ export default function Admin() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button className="bg-primary text-primary-foreground">
+            <Button 
+              className="bg-primary text-primary-foreground"
+              onClick={() => toast({
+                title: "Coming Soon",
+                description: `Add new ${activeTab === 'locations' ? 'Location' : activeTab === 'users' ? 'User' : 'Group'} feature will be available soon.`,
+              })}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add {activeTab === 'locations' ? 'Location' : activeTab === 'users' ? 'User' : 'Group'}
             </Button>
@@ -90,10 +98,27 @@ export default function Admin() {
                         <TableCell className="text-muted-foreground font-mono text-xs">{location.id}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => toast({
+                                title: "Edit Location",
+                                description: `Editing "${location.name}" - feature coming soon.`,
+                              })}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => toast({
+                                title: "Confirm Delete",
+                                description: `Are you sure you want to delete "${location.name}"?`,
+                                variant: "destructive",
+                              })}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -137,10 +162,27 @@ export default function Admin() {
                         <TableCell>{user.group || "-"}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => toast({
+                                title: "Edit User",
+                                description: `Editing "${user.name}" - feature coming soon.`,
+                              })}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => toast({
+                                title: "Confirm Delete",
+                                description: `Are you sure you want to delete "${user.name}"?`,
+                                variant: "destructive",
+                              })}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -188,10 +230,27 @@ export default function Admin() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => toast({
+                                title: "Edit Group",
+                                description: `Editing "${group.name}" - feature coming soon.`,
+                              })}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => toast({
+                                title: "Confirm Delete",
+                                description: `Are you sure you want to delete "${group.name}"?`,
+                                variant: "destructive",
+                              })}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>

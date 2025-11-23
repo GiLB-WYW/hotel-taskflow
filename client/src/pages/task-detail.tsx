@@ -7,10 +7,12 @@ import { TASKS, LOCATIONS, USERS, PRIORITIES, Task } from "@/lib/mockData";
 import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TaskDetail() {
   const [, params] = useRoute("/task/:id");
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   
   const task = TASKS.find(t => t.id === params?.id);
   
@@ -68,7 +70,14 @@ export default function TaskDetail() {
             </div>
           </div>
           
-          <Button variant="outline" className="gap-2 flex-shrink-0 text-xs sm:text-sm h-9 sm:h-10">
+          <Button 
+            variant="outline" 
+            className="gap-2 flex-shrink-0 text-xs sm:text-sm h-9 sm:h-10"
+            onClick={() => toast({
+              title: "Exporting Fiche",
+              description: "Your PDF fiche technique is being generated...",
+            })}
+          >
             <Download className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
             <span className="hidden sm:inline">Export Fiche</span>
             <span className="sm:hidden">Export</span>
@@ -144,7 +153,14 @@ export default function TaskDetail() {
                       <span className="text-sm font-medium">{assignee.name}</span>
                     </div>
                   ) : (
-                     <Button variant="outline" className="w-full border-dashed text-muted-foreground">
+                     <Button 
+                       variant="outline" 
+                       className="w-full border-dashed text-muted-foreground"
+                       onClick={() => toast({
+                         title: "Assign Person",
+                         description: "Select a team member to assign this task.",
+                       })}
+                     >
                        <User className="h-4 w-4 mr-2" />
                        Assign Person
                      </Button>
@@ -170,10 +186,23 @@ export default function TaskDetail() {
             </Card>
 
             <div className="flex flex-col gap-2">
-               <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+               <Button 
+                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                 onClick={() => toast({
+                   title: "Add Note",
+                   description: "Note feature coming soon. You can add internal notes to this task.",
+                 })}
+               >
                  <MessageSquare className="h-4 w-4 mr-2" /> Add Note
                </Button>
-               <Button variant="outline" className="w-full border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300">
+               <Button 
+                 variant="outline" 
+                 className="w-full border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                 onClick={() => toast({
+                   title: "Task Marked Resolved",
+                   description: "Task status has been updated to Resolved.",
+                 })}
+               >
                  <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Resolved
                </Button>
             </div>
