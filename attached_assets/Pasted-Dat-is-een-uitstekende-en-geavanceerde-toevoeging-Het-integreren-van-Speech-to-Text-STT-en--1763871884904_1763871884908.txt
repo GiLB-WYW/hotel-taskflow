@@ -1,0 +1,67 @@
+Dat is een uitstekende en geavanceerde toevoeging! Het integreren van **Speech-to-Text (STT)** en **AI-vertaling/samenvatting** verhoogt de efficiëntie voor uw basispersoneel, ongeacht hun moedertaal. Dit maakt de app werkelijk **inclusief** en **tijdsefficiënt**.
+
+Hieronder vindt u de bijgewerkte PWA-specificaties in het Engels (met de locatienamen in het Frans) en de integratie van de nieuwe AI-workflow.
+
+---
+
+## 🇺🇸 PWA: Hotel Maintenance Management System (Hôtel TaskFlow)
+
+### **1. Core System Requirements (The AI-Enhanced Workflow)**
+
+The most critical update is the **Task Creation** process for the Basic Staff:
+
+| Step | Action | Tools/Technology | Benefit |
+| :--- | :--- | :--- | :--- |
+| **1. Personnel Input**| Personnel records the issue via **voice message** (in any language, e.g., Polish) and takes a **photo**. | Web Speech API (for STT) & Camera API | Fast, hands-free, multilingual reporting. |
+| **2. STT & Translation**| The voice recording is converted to text. The AI then **translates** the text from the source language (e.g., Polish) to the application's default language for descriptions (**French or English**). | Cloud-based STT (e.g., Google/Azure/OpenAI) and Translation API | Ensures all records are uniform and readable by all managers. |
+| **3. Summarization/Essence**| The AI analyzes the translated text to extract the **essence** of the issue, creating a short, clear title or summary (e.g., "Air Conditioning Filter Cleaning – Urgent"). | Natural Language Processing (NLP) Model | Provides managers with an instant, clear overview without having to read long descriptions. |
+| **4. Task Finalization**| The system automatically populates the task form with the Location, Photo, Translated Description, and AI-Generated Title. The Basic Staff only needs to select the initial **Priority**. | PWA Frontend & Backend Database | Minimizes human error and speeds up the reporting process. |
+
+### **2. PWA Functional Requirements**
+
+#### **A. User Roles and Permissions**
+
+| User Role | Access & Permissions |
+| :--- | :--- |
+| **Admin** | Full control: Add/Delete/Modify Locations, Users, Categories, and Tasks. Can download Fiches. |
+| **Manager** | Create Tasks, Change Priority, Assign, Change Status, View/Download Fiches. |
+| **Personnel (Technical/Cleaning)** | View assigned tasks. Change task status to **'In Progress'** and **'Resolved'**. |
+| **Basic Staff** | **Only** allowed to create a **New Task** using the **Voice/Photo workflow**. |
+
+#### **B. Key Features**
+
+| Feature | Description |
+| :--- | :--- |
+| **Task Creation** | **AI-powered** (as described above). Includes Location, Photo, Priority (Red Flag, High, Normal, Low), and Group Assignment (Plomberie, Électricité, etc.). |
+| **Dashboard/Task List**| Real-time overview of **all open tasks**. **Filtering** by Location, Priority, Status, and Assigned Group/Person. Default sorting by **Priority** (Red Flag at the top). |
+| **Archive & Documentation**| **"Fiche Technique" Generation:** Ability to generate and download a PDF/CSV file for selected tasks, filtered by **Assigned Group** (e.g., all tasks for the Plombier) or **Location** (e.g., all resolved issues for Suite C2 last month). |
+| **Admin Management**| Panel to manage **Locations** (titles must be mutable by Admin), Users/Roles, and Maintenance Groups. |
+| **PWA Capability**| **Offline Mode** via Service Worker and IndexedDB for basic task creation and viewing of cached data. **Installable** via `manifest.json`. |
+
+### **3. Hotel Structure and Locations (French Names)**
+
+The titles of the locations must be modifiable by the Admin.
+
+| Category (Catégorie) | Location Name (Nom de la Localisation) |
+| :--- | :--- |
+| **Restaurant** | **Le Restaurant**, **Prive 1**, **Prive 2**, **Cuisine Le Restaurant** |
+| **Suites B** | **Suite B1**, **Suite B2**, **Suite B3** |
+| **Suites C** | **Suite C1**, **Suite C2**, **Suite C3**, **Suite C4** |
+| **Suites H** | **Suite H1**, **Suite H2**, **Suite H3**, **Suite H4** |
+| **Suites I** | **Suite I1**, **Suite I2**, **Suite I3** |
+| **Suites G** | **Suite G1**, **Suite G2**, **Suite G3** |
+| **Suites J** | **Suite J1**, **Suite J2**, **Suite J3**, **Suite J4**, **Suite J5** |
+| **La Guinguette** | **La Guinguette Cuisine**, **La Guinguette le Bar**, **La Guinguette Salle**, **Machine Piscine Guinguette** |
+| **Technical/Storage** | **La Réception**, **TB Contemporary**, **Stock B Cuisine**, **Stock B Ménage**, **Laverie B**, **Stock C Ménage**, **Cave à Vin**, **Stock Serveur**, **Stock Ménage H**, **Stock Ménage I**, **Stock Ménage G**, **Stock Bureau**, **Bureau**, **Stock Ménage J**, **Stock Elise**, **Stock Boisson**, **Cuisine Préparatoire** |
+| **Pool Machinery** | **Machine Piscine C**, **Machine Piscine A**, **Machine Piscine J** |
+
+### **4. Prioritization Definitions**
+
+| Priority (Priorité) | SLA (Service Level Agreement) | Example | Key Flag |
+| :--- | :--- | :--- | :--- |
+| **Red Flag (Instantané)** | Within 1 Hour (Instant fix) | Major water leak, no running water, power outage. | **CRITICAL** |
+| **High (Urgent)** | Within 4 to 24 Hours | Major AC failure, broken door lock in a suite. | **URGENT** |
+| **Normal (Routine)** | Within 48 Hours | Cleaning AC filters, broken lamp, minor furniture damage. | **DEFAULT** |
+| **Low (Preventive)** | Within 7+ Days | Small wall crack, preventative maintenance warning. | **WARNING** |
+
+Deze bijgewerkte specificatie combineert robuust hotelmanagement met geavanceerde, meertalige AI-functionaliteit, wat het een zeer sterke en toekomstbestendige basis maakt voor uw Replit-opdracht.
