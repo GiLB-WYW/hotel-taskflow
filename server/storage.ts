@@ -19,6 +19,9 @@ import {
 } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { ZodError } from "zod";
+import bcrypt from "bcrypt";
+
+const SALT_ROUNDS = 10;
 
 export interface IStorage {
   // Users
@@ -27,6 +30,8 @@ export interface IStorage {
   getUserByAuthId(authProvider: string, authId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  updatePassword(userId: string, newPassword: string): Promise<void>;
+  verifyPassword(userId: string, password: string): Promise<boolean>;
   listUsers(): Promise<User[]>;
 
   // Locations
@@ -74,13 +79,36 @@ export class PostgresStorage implements IStorage {
 
   async createUser(data: InsertUser): Promise<User> {
     const validated = insertUserSchema.parse(data);
-    const user = await db.insert(usersTable).values(validated).returning();
+    
+    // Hash password if provided
+    let userData = { ...validated };
+    if (validated.password) {
+      const hashedPassword = await bcrypt.hash(validated.password, SALT_ROUNDS);
+      userData = { ...validated, password: hashedPassword };
+    }
+    
+    const user = await db.insert(usersTable).values(userData).returning();
     return user[0];
   }
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
     const user = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     return user[0];
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await db.update(usersTable)
+      .set({ password: hashedPassword })
+      .where(eq(usersTable.id, userId));
+  }
+
+  async verifyPassword(userId: string, password: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    if (!user || !user.password) {
+      return false;
+    }
+    return await bcrypt.compare(password, user.password);
   }
 
   async listUsers(): Promise<User[]> {
