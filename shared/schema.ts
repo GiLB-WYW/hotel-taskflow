@@ -8,6 +8,7 @@ export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password"), // Hashed password (bcrypt), optional for OAuth users
   role: varchar("role").notNull().default("Basic Staff"), // Admin, Manager, Personnel, Basic Staff
   group: varchar("group"), // Maintenance group ID
   authProvider: varchar("auth_provider").default("email"), // email, google, microsoft
