@@ -27,7 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, password } = req.body;
       
       if (!email) {
         return res.status(400).json({ error: "Email required" });
@@ -36,10 +36,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserByEmail(email);
       
       if (!user) {
-        return res.status(401).json({ error: "User not found" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      res.json(user);
+      // If user has a password, verify it
+      if (user.password) {
+        if (!password) {
+          return res.status(400).json({ error: "Password required" });
+        }
+
+        const isValid = await storage.verifyPassword(user.id, password);
+        if (!isValid) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
+      }
+
+      // Don't send password hash to client
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ error: "Login failed" });
     }
@@ -230,6 +244,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.errors });
       }
       res.status(500).json({ error: "Failed to create maintenance group" });
+    }
+  });
+
+  // Password Reset
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, currentPassword, newPassword } = req.body;
+      
+      if (!email || !currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Email, current password, and new password required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify current password
+      const isValid = await storage.verifyPassword(user.id, currentPassword);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid current password" });
+      }
+
+      // Update to new password
+      await storage.updatePassword(user.id, newPassword);
+      
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Password reset failed" });
     }
   });
 
