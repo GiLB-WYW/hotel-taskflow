@@ -32,6 +32,7 @@ export default function CreateTask() {
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Recording Timer
   useEffect(() => {
@@ -71,12 +72,35 @@ export default function CreateTask() {
   };
 
   const takePhoto = () => {
-    // Mock photo capture
-    setPhoto("https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=600");
-    toast({
-      title: "Photo captured",
-      description: "Image attached to the task.",
-    });
+    // Trigger the hidden file input
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert to base64 for preview and storage
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setPhoto(base64String);
+      toast({
+        title: "Photo captured",
+        description: "Image attached to the task.",
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const processAI = () => {
@@ -107,13 +131,54 @@ export default function CreateTask() {
     }, 3000);
   };
 
-  const submitTask = () => {
-    toast({
-      title: "Task Created Successfully",
-      description: "The maintenance team has been notified.",
-    });
-    setStep("success");
-    setTimeout(() => navigate("/"), 2000);
+  const submitTask = async () => {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (!userStr) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to create tasks.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const user = JSON.parse(userStr);
+
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          originalTranscript: formData.originalTranscript,
+          locationId: formData.locationId,
+          priority: formData.priority,
+          assignedGroup: formData.assignedGroup,
+          imageUrl: photo, // Send base64 image
+          createdBy: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create task");
+      }
+
+      toast({
+        title: "Task Created Successfully",
+        description: "The maintenance team has been notified.",
+      });
+      setStep("success");
+      setTimeout(() => navigate("/"), 2000);
+    } catch (error) {
+      toast({
+        title: "Failed to Create Task",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -189,15 +254,24 @@ export default function CreateTask() {
             </Card>
 
             {/* Photo Capture */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoSelected}
+            />
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <Button 
                 variant="outline" 
                 className="h-24 flex flex-col gap-2 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50"
                 onClick={takePhoto}
+                data-testid="button-add-photo"
               >
                 {photo ? (
                    <div className="relative h-full w-full overflow-hidden rounded">
-                     <img src={photo} className="h-full w-full object-cover opacity-50" />
+                     <img src={photo} className="h-full w-full object-cover opacity-50" alt="Captured task photo" />
                      <div className="absolute inset-0 flex items-center justify-center">
                         <Check className="h-6 w-6 text-green-600" />
                      </div>
