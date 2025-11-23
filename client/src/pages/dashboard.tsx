@@ -5,7 +5,7 @@ import { TASKS, TASKS as INITIAL_TASKS, LOCATIONS, Task } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, ArrowUpDown, AlertTriangle } from "lucide-react";
+import { Search, Filter, ArrowUpDown, AlertTriangle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 
@@ -36,7 +36,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 pb-32">
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between">
@@ -152,6 +152,16 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setLocation("/create-task")}
+        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 h-16 w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-40 group"
+        data-testid="button-create-task-fab"
+      >
+        <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <Plus className="h-7 w-7 relative z-10" />
+      </button>
     </Layout>
   );
 }
