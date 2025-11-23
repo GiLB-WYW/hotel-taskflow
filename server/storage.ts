@@ -1,38 +1,187 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import {
+  type User,
+  type InsertUser,
+  type Location,
+  type InsertLocation,
+  type MaintenanceGroup,
+  type InsertMaintenanceGroup,
+  type Task,
+  type InsertTask,
+  usersTable,
+  locationsTable,
+  maintenanceGroupsTable,
+  tasksTable,
+  insertUserSchema,
+  insertLocationSchema,
+  insertMaintenanceGroupSchema,
+  insertTaskSchema,
+} from "@shared/schema";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { ZodError } from "zod";
 
 export interface IStorage {
+  // Users
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByAuthId(authProvider: string, authId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  listUsers(): Promise<User[]>;
+
+  // Locations
+  getLocation(id: string): Promise<Location | undefined>;
+  getLocationByCode(code: string): Promise<Location | undefined>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  listLocations(): Promise<Location[]>;
+
+  // Maintenance Groups
+  getMaintenanceGroup(id: string): Promise<MaintenanceGroup | undefined>;
+  createMaintenanceGroup(group: InsertMaintenanceGroup): Promise<MaintenanceGroup>;
+  listMaintenanceGroups(): Promise<MaintenanceGroup[]>;
+
+  // Tasks
+  getTask(id: string): Promise<Task | undefined>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
+  listTasks(filters?: {
+    locationId?: string;
+    status?: string;
+    assignedGroup?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<Task[]>;
+  listTasksByLocation(locationId: string, startDate?: Date, endDate?: Date): Promise<Task[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class PostgresStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const user = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    return user[0];
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    return user[0];
+  }
+
+  async getUserByAuthId(authProvider: string, authId: string): Promise<User | undefined> {
+    const user = await db.select().from(usersTable).where(
+      and(eq(usersTable.authProvider, authProvider), eq(usersTable.authId, authId))
     );
+    return user[0];
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createUser(data: InsertUser): Promise<User> {
+    const validated = insertUserSchema.parse(data);
+    const user = await db.insert(usersTable).values(validated).returning();
+    return user[0];
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
+    const user = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
+    return user[0];
+  }
+
+  async listUsers(): Promise<User[]> {
+    return await db.select().from(usersTable);
+  }
+
+  async getLocation(id: string): Promise<Location | undefined> {
+    const location = await db.select().from(locationsTable).where(eq(locationsTable.id, id));
+    return location[0];
+  }
+
+  async getLocationByCode(code: string): Promise<Location | undefined> {
+    const location = await db.select().from(locationsTable).where(eq(locationsTable.code, code));
+    return location[0];
+  }
+
+  async createLocation(data: InsertLocation): Promise<Location> {
+    const validated = insertLocationSchema.parse(data);
+    const location = await db.insert(locationsTable).values(validated).returning();
+    return location[0];
+  }
+
+  async listLocations(): Promise<Location[]> {
+    return await db.select().from(locationsTable);
+  }
+
+  async getMaintenanceGroup(id: string): Promise<MaintenanceGroup | undefined> {
+    const group = await db.select().from(maintenanceGroupsTable).where(eq(maintenanceGroupsTable.id, id));
+    return group[0];
+  }
+
+  async createMaintenanceGroup(data: InsertMaintenanceGroup): Promise<MaintenanceGroup> {
+    const validated = insertMaintenanceGroupSchema.parse(data);
+    const group = await db.insert(maintenanceGroupsTable).values(validated).returning();
+    return group[0];
+  }
+
+  async listMaintenanceGroups(): Promise<MaintenanceGroup[]> {
+    return await db.select().from(maintenanceGroupsTable);
+  }
+
+  async getTask(id: string): Promise<Task | undefined> {
+    const task = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+    return task[0];
+  }
+
+  async createTask(data: InsertTask): Promise<Task> {
+    const validated = insertTaskSchema.parse(data);
+    const task = await db.insert(tasksTable).values(validated).returning();
+    return task[0];
+  }
+
+  async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task> {
+    const task = await db.update(tasksTable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tasksTable.id, id))
+      .returning();
+    return task[0];
+  }
+
+  async listTasks(filters?: {
+    locationId?: string;
+    status?: string;
+    assignedGroup?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<Task[]> {
+    let query = db.select().from(tasksTable);
+
+    const conditions = [];
+    if (filters?.locationId) {
+      conditions.push(eq(tasksTable.locationId, filters.locationId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(tasksTable.status, filters.status));
+    }
+    if (filters?.assignedGroup) {
+      conditions.push(eq(tasksTable.assignedGroup, filters.assignedGroup));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(tasksTable.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(tasksTable.createdAt, filters.endDate));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    const tasks = await query.orderBy(desc(tasksTable.createdAt));
+    return tasks;
+  }
+
+  async listTasksByLocation(locationId: string, startDate?: Date, endDate?: Date): Promise<Task[]> {
+    return this.listTasks({
+      locationId,
+      startDate,
+      endDate,
+    });
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new PostgresStorage();
