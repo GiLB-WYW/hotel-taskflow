@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import CreateTask from "@/pages/create-task";
 import Admin from "@/pages/admin";
 import TaskDetail from "@/pages/task-detail";
+import LocationDetail from "@/pages/location-detail";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
@@ -24,6 +25,7 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Route path="/tasks" component={Dashboard} />
       <Route path="/admin" component={Admin} />
       <Route path="/task/:id" component={TaskDetail} />
+      <Route path="/location/:id" component={LocationDetail} />
       <Route component={NotFound} />
     </Switch>
   );

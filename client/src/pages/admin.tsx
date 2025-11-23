@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LOCATIONS, USERS, MAINTENANCE_GROUPS } from "@/lib/mockData";
-import { Plus, Trash2, Edit, Search, UserPlus, MapPin, Wrench } from "lucide-react";
+import { Plus, Trash2, Edit, Search, UserPlus, MapPin, Wrench, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("locations");
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setPageLocation] = useLocation();
   const { toast } = useToast();
 
   const filteredLocations = LOCATIONS.filter(l => 
@@ -98,6 +100,15 @@ export default function Admin() {
                         <TableCell className="text-muted-foreground font-mono text-xs">{location.id}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => setPageLocation(`/location/${location.id}`)}
+                              title="View location details"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="icon" 
