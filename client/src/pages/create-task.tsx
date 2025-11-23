@@ -18,6 +18,8 @@ export default function CreateTask() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [textInput, setTextInput] = useState("");
+  const [transcript, setTranscript] = useState("");
   const { toast } = useToast();
   const [, navigate] = useLocation();
   
@@ -33,6 +35,7 @@ export default function CreateTask() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   // Recording Timer
   useEffect(() => {
@@ -55,20 +58,86 @@ export default function CreateTask() {
   };
 
   const startRecording = () => {
+    // Check if browser supports Web Speech API
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Please use the text input instead or try a different browser.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'fr-FR'; // Default to French, but will accept any language
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcriptPiece = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcriptPiece + ' ';
+        } else {
+          interimTranscript += transcriptPiece;
+        }
+      }
+      
+      setTranscript(finalTranscript + interimTranscript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      toast({
+        title: "Recording Error",
+        description: "Could not capture audio. Please try again.",
+        variant: "destructive",
+      });
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      if (isRecording) {
+        recognition.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    
     setIsRecording(true);
     setRecordingTime(0);
     setAudioUrl(null);
-    // In a real app, we would use the MediaRecorder API here
+    setTranscript('');
   };
 
   const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    
     setIsRecording(false);
-    // Mock audio blob URL
-    setAudioUrl("mock_audio.mp3");
-    toast({
-      title: "Recording saved",
-      description: "Your voice message has been captured.",
-    });
+    
+    if (transcript.trim()) {
+      setAudioUrl("recorded");
+      toast({
+        title: "Recording saved",
+        description: "Your voice message has been captured.",
+      });
+    } else {
+      toast({
+        title: "No Speech Detected",
+        description: "Please try recording again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const takePhoto = () => {
@@ -103,11 +172,13 @@ export default function CreateTask() {
     reader.readAsDataURL(file);
   };
 
-  const processAI = () => {
-    if (!audioUrl && !photo) {
+  const processAI = async () => {
+    const inputText = transcript.trim() || textInput.trim();
+    
+    if (!inputText && !photo) {
       toast({
         title: "Missing Input",
-        description: "Please record a voice message or take a photo first.",
+        description: "Please record a voice message, type a description, or take a photo.",
         variant: "destructive",
       });
       return;
@@ -116,19 +187,45 @@ export default function CreateTask() {
     setStep("processing");
     setIsProcessing(true);
 
-    // Simulate AI Processing Delay
-    setTimeout(() => {
-      setFormData({
-        title: "Leaking Faucet in Bathroom",
-        description: "There is a persistent drip coming from the hot water tap in the master bathroom sink. It's causing water to pool on the counter.",
-        originalTranscript: "Uh, hi. I'm in Suite B2. The... the faucet in the bathroom is leaking really bad. It's the hot water one. Needs fixing.",
-        priority: "Normal",
-        locationId: "loc-b2", // Auto-detected from context or metadata
-        assignedGroup: "g1", // Auto-detect: Plomberie for plumbing issues
+    try {
+      const response = await fetch("/api/ai/process-task", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: inputText,
+          hasPhoto: !!photo,
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error("AI processing failed");
+      }
+
+      const data = await response.json();
+      
+      setFormData({
+        title: data.title,
+        description: data.description,
+        originalTranscript: inputText,
+        priority: data.priority || "Normal",
+        locationId: data.locationId || "",
+        assignedGroup: data.assignedGroup || "",
+      });
+      
       setIsProcessing(false);
       setStep("review");
-    }, 3000);
+    } catch (error) {
+      console.error("AI processing error:", error);
+      toast({
+        title: "Processing Failed",
+        description: "Could not process your request. Please try again.",
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+      setStep("capture");
+    }
   };
 
   const submitTask = async () => {
@@ -253,6 +350,22 @@ export default function CreateTask() {
               </CardContent>
             </Card>
 
+            {/* Text Input Alternative */}
+            <Card className="border-2 border-primary/20 bg-background">
+              <CardContent className="p-4">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Or Type Your Description
+                </label>
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Describe the maintenance issue in a few words..."
+                  className="w-full p-3 bg-muted/30 rounded-md border border-border text-sm min-h-[80px] focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                  data-testid="input-text-description"
+                />
+              </CardContent>
+            </Card>
+
             {/* Photo Capture */}
             <input
               ref={fileInputRef}
@@ -285,8 +398,9 @@ export default function CreateTask() {
               </Button>
                <Button 
                 className="h-24 flex flex-col gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
-                disabled={!audioUrl && !photo}
+                disabled={!audioUrl && !photo && !textInput.trim()}
                 onClick={processAI}
+                data-testid="button-process-task"
               >
                 <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/20 mb-1">
                   <span className="text-lg font-bold">AI</span>
