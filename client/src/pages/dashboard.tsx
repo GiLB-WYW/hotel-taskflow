@@ -58,16 +58,24 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 pb-32">
-        {/* Stats Overview */}
+        {/* Stats Overview - Clickable Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div 
+            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
+            onClick={() => setStatusFilter("Open")}
+            data-testid="card-open-tasks"
+          >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open Tasks</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
               <span className="text-2xl sm:text-3xl font-bold text-primary">{tasks.filter(t => t.status === "Open").length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">tasks</span>
             </div>
           </div>
-          <div className="bg-card border border-red-200 bg-red-50/50 rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div 
+            className="bg-card border border-red-200 bg-red-50/50 rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
+            onClick={() => setPriorityFilter("Red Flag")}
+            data-testid="card-critical"
+          >
             <div className="flex items-center justify-between">
               <p className="text-red-700/80 text-[10px] sm:text-xs font-medium uppercase tracking-wider">Critical</p>
               <AlertTriangle className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-red-600" />
@@ -77,49 +85,28 @@ export default function Dashboard() {
               <span className="text-[10px] sm:text-xs text-red-600/80">needs attention</span>
             </div>
           </div>
-          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div 
+            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
+            onClick={() => setStatusFilter("In Progress")}
+            data-testid="card-in-progress"
+          >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">In Progress</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
               <span className="text-2xl sm:text-3xl font-bold text-primary">{tasks.filter(t => t.status === "In Progress").length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">active</span>
             </div>
           </div>
-          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div 
+            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
+            onClick={() => setStatusFilter("Resolved")}
+            data-testid="card-resolved"
+          >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Resolved Today</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
               <span className="text-2xl sm:text-3xl font-bold text-green-600">12</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">completed</span>
             </div>
           </div>
-        </div>
-
-        {/* Quick Filter Buttons */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <Button
-            variant={quickFilter === "all" ? "default" : "outline"}
-            onClick={() => setQuickFilter("all")}
-            className="flex-shrink-0 h-10"
-            data-testid="button-filter-all"
-          >
-            All Tasks
-          </Button>
-          <Button
-            variant={quickFilter === "critical" ? "default" : "outline"}
-            onClick={() => setQuickFilter("critical")}
-            className="flex-shrink-0 h-10 border-red-200 hover:bg-red-50"
-            data-testid="button-filter-critical"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Open / Critical
-          </Button>
-          <Button
-            variant={quickFilter === "others" ? "default" : "outline"}
-            onClick={() => setQuickFilter("others")}
-            className="flex-shrink-0 h-10"
-            data-testid="button-filter-others"
-          >
-            Others
-          </Button>
         </div>
 
         {/* Filters */}
