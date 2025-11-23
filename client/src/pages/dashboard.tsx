@@ -36,56 +36,56 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-6 pb-32">
+      <div className="space-y-4 sm:space-y-6 pb-32">
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Open Tasks</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-primary">{tasks.filter(t => t.status === "Open").length}</span>
-              <span className="text-xs text-muted-foreground">tasks</span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+            <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open Tasks</p>
+            <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-bold text-primary">{tasks.filter(t => t.status === "Open").length}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">tasks</span>
             </div>
           </div>
-          <div className="bg-card border border-red-200 bg-red-50/50 rounded-xl p-4 shadow-sm flex flex-col justify-between">
+          <div className="bg-card border border-red-200 bg-red-50/50 rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <p className="text-red-700/80 text-xs font-medium uppercase tracking-wider">Critical</p>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <p className="text-red-700/80 text-[10px] sm:text-xs font-medium uppercase tracking-wider">Critical</p>
+              <AlertTriangle className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-red-600" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-red-700">{redFlagCount}</span>
-              <span className="text-xs text-red-600/80">needs attention</span>
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">In Progress</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-primary">{tasks.filter(t => t.status === "In Progress").length}</span>
-              <span className="text-xs text-muted-foreground">active</span>
+            <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-bold text-red-700">{redFlagCount}</span>
+              <span className="text-[10px] sm:text-xs text-red-600/80">needs attention</span>
             </div>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Resolved Today</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-green-600">12</span>
-              <span className="text-xs text-muted-foreground">completed</span>
+          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+            <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">In Progress</p>
+            <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-bold text-primary">{tasks.filter(t => t.status === "In Progress").length}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">active</span>
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between">
+            <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Resolved Today</p>
+            <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-bold text-green-600">12</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">completed</span>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 items-center bg-card p-3 rounded-lg border border-border shadow-sm">
-          <div className="relative w-full md:w-96">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center bg-card p-3 rounded-lg border border-border shadow-sm">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search tasks..." 
-              className="pl-9 bg-background"
+              className="pl-9 bg-background h-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
              <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] bg-background">
+              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -97,7 +97,7 @@ export default function Dashboard() {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[140px] bg-background">
+              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -109,7 +109,7 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
             
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
+            <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10">
               <ArrowUpDown className="h-4 w-4" />
             </Button>
           </div>
@@ -125,7 +125,7 @@ export default function Dashboard() {
           </h3>
           
           {sortedTasks.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {sortedTasks.map(task => (
                 <TaskCard 
                   key={task.id} 
@@ -156,11 +156,11 @@ export default function Dashboard() {
       {/* Floating Action Button */}
       <button
         onClick={() => setLocation("/create-task")}
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 h-16 w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-40 group"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-40 group"
         data-testid="button-create-task-fab"
       >
         <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <Plus className="h-7 w-7 relative z-10" />
+        <Plus className="h-6 sm:h-7 w-6 sm:w-7 relative z-10" />
       </button>
     </Layout>
   );

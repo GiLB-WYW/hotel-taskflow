@@ -118,10 +118,10 @@ export default function CreateTask() {
 
   return (
     <Layout userRole="Basic Staff">
-      <div className="max-w-xl mx-auto">
-        <div className="mb-8 text-center">
-          <h1 className="font-serif font-bold text-3xl text-primary mb-2">New Task</h1>
-          <p className="text-muted-foreground">
+      <div className="max-w-xl mx-auto px-0 sm:px-4">
+        <div className="mb-6 sm:mb-8 text-center">
+          <h1 className="font-serif font-bold text-2xl sm:text-3xl text-primary mb-2">New Task</h1>
+          <p className="text-sm sm:text-base text-muted-foreground px-2">
             Record a voice message describing the issue. The AI will fill out the form for you.
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function CreateTask() {
             </Card>
 
             {/* Photo Capture */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <Button 
                 variant="outline" 
                 className="h-24 flex flex-col gap-2 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50"
@@ -244,9 +244,9 @@ export default function CreateTask() {
 
         {/* Step 3: Review */}
         {step === "review" && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
+          <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-8 duration-500">
             <Card className="border-t-4 border-t-primary shadow-lg">
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Suggested Title</label>
                   <div className="text-xl font-serif font-bold text-primary">{formData.title}</div>

@@ -32,49 +32,51 @@ export default function TaskDetail() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         <Button 
           variant="ghost" 
-          className="pl-0 hover:bg-transparent hover:text-primary"
+          className="pl-0 hover:bg-transparent hover:text-primary h-9"
           onClick={() => setLocation("/")}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
+          <span className="hidden sm:inline">Back to Dashboard</span>
+          <span className="sm:hidden">Back</span>
         </Button>
 
-        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Badge variant="outline" className={cn("text-sm px-3 py-1", priorityConfig.color)}>
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <Badge variant="outline" className={cn("text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1", priorityConfig.color)}>
                 {task.priority}
               </Badge>
-              <Badge variant="secondary" className="text-sm px-3 py-1">
+              <Badge variant="secondary" className="text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1">
                 {task.status}
               </Badge>
             </div>
-            <h1 className="text-3xl font-serif font-bold text-primary leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary leading-tight break-words">
               {task.title}
             </h1>
-            <div className="flex items-center gap-4 mt-2 text-muted-foreground text-sm">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-2 text-muted-foreground text-xs sm:text-sm">
               <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" />
-                {location?.name} ({location?.category})
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{location?.name} ({location?.category})</span>
               </span>
               <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                {format(new Date(task.createdAt), "PPP 'at' p")}
+                <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{format(new Date(task.createdAt), "PPP 'at' p")}</span>
               </span>
             </div>
           </div>
           
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export Fiche
+          <Button variant="outline" className="gap-2 flex-shrink-0 text-xs sm:text-sm h-9 sm:h-10">
+            <Download className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
+            <span className="hidden sm:inline">Export Fiche</span>
+            <span className="sm:hidden">Export</span>
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="sm:col-span-2 space-y-4 sm:space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Description</CardTitle>

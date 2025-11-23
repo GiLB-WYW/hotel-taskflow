@@ -21,7 +21,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, userRole = "Manager" }: LayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -33,19 +33,25 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
-      <div className="p-6 border-b border-border/50">
+      <button 
+        onClick={() => {
+          setLocation("/");
+          setIsMobileMenuOpen(false);
+        }}
+        className="p-6 border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
+      >
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-serif font-bold text-xl">H</span>
           </div>
-          <div>
+          <div className="text-left">
             <h1 className="font-serif font-bold text-lg tracking-tight text-primary">Hôtel TaskFlow</h1>
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Maintenance</p>
           </div>
         </div>
-      </div>
+      </button>
 
-      <div className="flex-1 py-6 px-3 space-y-1">
+      <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
         {navItems.filter(item => !item.hide).map((item) => {
           const isActive = location === item.href;
           return (
@@ -53,33 +59,34 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-3 font-medium mb-1 h-11",
+                  "w-full justify-start gap-3 font-medium mb-1 h-11 transition-colors",
                   isActive 
                     ? "bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
+                onClick={() => setIsMobileMenuOpen(false)}
               >
-                <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
-                {item.label}
+                <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+                <span className="truncate">{item.label}</span>
               </Button>
             </Link>
           );
         })}
       </div>
 
-      <div className="p-4 border-t border-border/50">
+      <div className="p-4 border-t border-border/50 mt-auto">
         <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-muted/50">
-          <Avatar className="h-9 w-9 border border-border">
+          <Avatar className="h-9 w-9 border border-border shrink-0">
             <AvatarFallback className="bg-primary text-primary-foreground">JD</AvatarFallback>
           </Avatar>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-w-0">
             <p className="text-sm font-medium truncate">Jean Dupont</p>
             <p className="text-xs text-muted-foreground truncate">{userRole}</p>
           </div>
         </div>
-        <Button variant="outline" className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive">
-          <LogOut className="h-4 w-4" />
-          Log Out
+        <Button variant="outline" className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-colors">
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="truncate">Log Out</span>
         </Button>
       </div>
     </div>
@@ -95,26 +102,29 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
       {/* Main Content */}
       <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
         {/* Mobile Header */}
-        <header className="md:hidden h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 px-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center">
+        <header className="md:hidden h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 px-4 flex items-center justify-between gap-2">
+          <button 
+            onClick={() => setLocation("/")}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-1 min-w-0"
+          >
+            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center flex-shrink-0">
               <span className="text-primary-foreground font-serif font-bold text-lg">H</span>
             </div>
-            <span className="font-serif font-bold text-lg text-primary">TaskFlow</span>
-          </div>
+            <span className="font-serif font-bold text-lg text-primary truncate">TaskFlow</span>
+          </button>
           
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="relative text-muted-foreground h-10 w-10">
               <Bell className="h-5 w-5" />
               <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-background"></span>
             </Button>
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" className="h-10 w-10">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-72">
+              <SheetContent side="left" className="p-0 w-64 sm:w-72">
                 <NavContent />
               </SheetContent>
             </Sheet>
@@ -122,24 +132,26 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
         </header>
 
         {/* Desktop Header (Actions only) */}
-        <header className="hidden md:flex h-16 border-b border-border bg-background/50 backdrop-blur sticky top-0 z-30 px-8 items-center justify-between">
-          <h2 className="font-serif font-semibold text-xl text-primary">
+        <header className="hidden md:flex h-16 border-b border-border bg-background/50 backdrop-blur sticky top-0 z-30 px-6 lg:px-8 items-center justify-between gap-4">
+          <h2 className="font-serif font-semibold text-lg lg:text-xl text-primary truncate">
             {navItems.find(i => i.href === location)?.label || "Dashboard"}
           </h2>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" className="gap-2">
+          <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 hidden lg:flex">
               <Bell className="h-4 w-4" />
               <span>Notifications</span>
             </Button>
-            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Task
+            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 lg:gap-2">
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden lg:inline">New Task</span>
             </Button>
           </div>
         </header>
 
-        <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
-          {children}
+        <div className="flex-1 p-3 sm:p-6 md:p-8 w-full animate-in fade-in duration-500 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </div>
       </main>
     </div>
