@@ -54,9 +54,8 @@ export default function Login() {
         description: `Welcome, ${user.name}!`,
       });
       
-      setIsLoading(false);
-      setLocation("/");
-    }, 1000);
+      window.location.href = "/";
+    }, 800);
   };
 
   const handleGoogleLogin = () => {
@@ -79,9 +78,8 @@ export default function Login() {
         description: "Welcome! You've been logged in with Google.",
       });
       
-      setIsLoading(false);
-      setLocation("/");
-    }, 1500);
+      window.location.href = "/";
+    }, 800);
   };
 
   const handleMicrosoftLogin = () => {
@@ -104,9 +102,8 @@ export default function Login() {
         description: "Welcome! You've been logged in with Microsoft.",
       });
       
-      setIsLoading(false);
-      setLocation("/");
-    }, 1500);
+      window.location.href = "/";
+    }, 800);
   };
 
   return (
