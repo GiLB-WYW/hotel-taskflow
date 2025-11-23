@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [quickFilter, setQuickFilter] = useState<"all" | "critical" | "others">("all");
   const [, setLocation] = useLocation();
 
   // Filter Logic with Smart Search
@@ -33,7 +34,17 @@ export default function Dashboard() {
     const matchesStatus = statusFilter === "All" || task.status === statusFilter;
     const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    // Quick filter logic
+    let matchesQuickFilter = true;
+    if (quickFilter === "critical") {
+      // Show Open tasks OR Critical (Red Flag) tasks
+      matchesQuickFilter = task.status === "Open" || task.priority === "Red Flag";
+    } else if (quickFilter === "others") {
+      // Show tasks that are NOT (Open OR Critical)
+      matchesQuickFilter = task.status !== "Open" && task.priority !== "Red Flag";
+    }
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesQuickFilter;
   });
 
   // Sort by Priority (Red Flag first)
@@ -80,6 +91,35 @@ export default function Dashboard() {
               <span className="text-[10px] sm:text-xs text-muted-foreground">completed</span>
             </div>
           </div>
+        </div>
+
+        {/* Quick Filter Buttons */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Button
+            variant={quickFilter === "all" ? "default" : "outline"}
+            onClick={() => setQuickFilter("all")}
+            className="flex-shrink-0 h-10"
+            data-testid="button-filter-all"
+          >
+            All Tasks
+          </Button>
+          <Button
+            variant={quickFilter === "critical" ? "default" : "outline"}
+            onClick={() => setQuickFilter("critical")}
+            className="flex-shrink-0 h-10 border-red-200 hover:bg-red-50"
+            data-testid="button-filter-critical"
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Open / Critical
+          </Button>
+          <Button
+            variant={quickFilter === "others" ? "default" : "outline"}
+            onClick={() => setQuickFilter("others")}
+            className="flex-shrink-0 h-10"
+            data-testid="button-filter-others"
+          >
+            Others
+          </Button>
         </div>
 
         {/* Filters */}
