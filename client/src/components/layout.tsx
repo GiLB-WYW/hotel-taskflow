@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { logout, getAuthUser } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +25,8 @@ interface LayoutProps {
 export function Layout({ children, userRole = "Manager" }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
+  const authUser = getAuthUser();
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -77,14 +81,26 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
       <div className="p-4 border-t border-border/50 mt-auto">
         <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-muted/50">
           <Avatar className="h-9 w-9 border border-border shrink-0">
-            <AvatarFallback className="bg-primary text-primary-foreground">JD</AvatarFallback>
+            <AvatarFallback className="bg-primary text-primary-foreground">{authUser?.avatar || "JD"}</AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden min-w-0">
-            <p className="text-sm font-medium truncate">Jean Dupont</p>
-            <p className="text-xs text-muted-foreground truncate">{userRole}</p>
+            <p className="text-sm font-medium truncate">{authUser?.name || "Jean Dupont"}</p>
+            <p className="text-xs text-muted-foreground truncate">{authUser?.provider === "google" ? "Google" : authUser?.provider === "microsoft" ? "Microsoft" : "Email"}</p>
           </div>
         </div>
-        <Button variant="outline" className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-colors">
+        <Button 
+          variant="outline" 
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-colors"
+          onClick={() => {
+            logout();
+            toast({
+              title: "Logged Out",
+              description: "You have been successfully logged out.",
+            });
+            setLocation("/");
+            window.location.reload();
+          }}
+        >
           <LogOut className="h-4 w-4 shrink-0" />
           <span className="truncate">Log Out</span>
         </Button>
