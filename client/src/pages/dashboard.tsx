@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { TaskCard } from "@/components/ui/task-card";
-import { TASKS, TASKS as INITIAL_TASKS, LOCATIONS, Task } from "@/lib/mockData";
+import { LOCATIONS, Task } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, ArrowUpDown, AlertTriangle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [quickFilter, setQuickFilter] = useState<"all" | "critical" | "others">("all");
   const [, setLocation] = useLocation();
+
+  // Fetch tasks from API
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({
+    queryKey: ["/api/tasks"],
+  });
 
   // Filter Logic with Smart Search
   const filteredTasks = tasks.filter(task => {
@@ -34,17 +38,7 @@ export default function Dashboard() {
     const matchesStatus = statusFilter === "All" || task.status === statusFilter;
     const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
     
-    // Quick filter logic
-    let matchesQuickFilter = true;
-    if (quickFilter === "critical") {
-      // Show Open tasks OR Critical (Red Flag) tasks
-      matchesQuickFilter = task.status === "Open" || task.priority === "Red Flag";
-    } else if (quickFilter === "others") {
-      // Show tasks that are NOT (Open OR Critical)
-      matchesQuickFilter = task.status !== "Open" && task.priority !== "Red Flag";
-    }
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesQuickFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
   });
 
   // Sort by Priority (Red Flag first)
@@ -54,6 +48,16 @@ export default function Dashboard() {
   });
 
   const redFlagCount = tasks.filter(t => t.priority === "Red Flag").length;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
