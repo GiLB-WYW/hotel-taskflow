@@ -37,25 +37,50 @@ export default function Login() {
 
     setIsLoading(true);
     
-    // Simulate login
-    setTimeout(() => {
-      const user = {
-        id: "user_" + Math.random().toString(36).substr(2, 9),
-        email,
-        name: email.split("@")[0],
-        provider: "email",
-        avatar: email[0].toUpperCase(),
-      };
-      
-      localStorage.setItem("user", JSON.stringify(user));
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: "Login Failed",
+          description: data.error || "Invalid credentials",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Store user data
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        provider: data.authProvider || "email",
+        avatar: data.avatar || email[0].toUpperCase(),
+      }));
       
       toast({
         title: "Login Successful",
-        description: `Welcome, ${user.name}!`,
+        description: `Welcome, ${data.name}!`,
       });
       
       window.location.href = "/";
-    }, 800);
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -245,11 +270,28 @@ export default function Login() {
               </Button>
             </div>
 
-            {/* Demo Info */}
-            <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-xs text-slate-300">
-                <span className="font-semibold text-blue-400">Demo Mode:</span> Use any email and password to sign in, or click Google/Microsoft buttons.
-              </p>
+            {/* Login Info & Password Reset */}
+            <div className="mt-6 space-y-3">
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setLocation("/reset-password")}
+                  className="text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                >
+                  Forgot your password?
+                </button>
+              </div>
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-xs text-slate-300">
+                  <span className="font-semibold text-blue-400">Admin Users:</span>
+                </p>
+                <ul className="text-xs text-slate-400 mt-2 space-y-1">
+                  <li>• gilles@toileblanche.com</li>
+                  <li>• nicolas@toileblanche.com</li>
+                  <li>• gregory@toileblanche.com</li>
+                  <li className="mt-2 text-slate-500">Default password: <span className="font-mono text-slate-300">Welcome123!</span></li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

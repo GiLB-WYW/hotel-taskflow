@@ -12,10 +12,17 @@ import CreateTask from "@/pages/create-task";
 import Admin from "@/pages/admin";
 import TaskDetail from "@/pages/task-detail";
 import LocationDetail from "@/pages/location-detail";
+import ResetPassword from "@/pages/reset-password";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
-    return <Login />;
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route component={Login} />
+      </Switch>
+    );
   }
 
   return (
