@@ -23,6 +23,13 @@ export interface Location {
   category: string;
 }
 
+export interface MaintenanceGroup {
+  id: string;
+  name: string;
+  description: string;
+  memberCount: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -41,7 +48,7 @@ export interface Task {
   priority: Priority;
   status: Status;
   assignedTo?: string; // User ID
-  assignedGroup?: Group;
+  assignedGroup?: string; // MaintenanceGroup ID or Group name
   createdBy: string; // User ID
   createdAt: string;
   imageUrl?: string;
@@ -69,6 +76,15 @@ export const LOCATIONS: Location[] = [
   { id: "loc-p1", category: "Pool Machinery", name: "Machine Piscine C" },
 ];
 
+// Maintenance Groups
+export const MAINTENANCE_GROUPS: MaintenanceGroup[] = [
+  { id: "g1", name: "Plomberie", description: "Plumbing & Water Systems", memberCount: 3 },
+  { id: "g2", name: "Électricité", description: "Electrical & Power Systems", memberCount: 2 },
+  { id: "g3", name: "Ménage", description: "Cleaning & Housekeeping", memberCount: 5 },
+  { id: "g4", name: "Général", description: "General Maintenance", memberCount: 4 },
+  { id: "g5", name: "Piscine", description: "Pool & Sauna Maintenance", memberCount: 2 },
+];
+
 // Users
 export const USERS: User[] = [
   { id: "u1", name: "Jean Dupont", role: "Admin", avatar: "JD" },
@@ -86,7 +102,7 @@ export const TASKS: Task[] = [
     locationId: "loc-b1",
     priority: "Red Flag",
     status: "Open",
-    assignedGroup: "Plomberie",
+    assignedGroup: "g1",
     createdBy: "u4",
     createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 mins ago
     imageUrl: "https://images.unsplash.com/photo-1585909696425-6408252a5f63?auto=format&fit=crop&q=80&w=600",
@@ -99,7 +115,7 @@ export const TASKS: Task[] = [
     priority: "Normal",
     status: "In Progress",
     assignedTo: "u3",
-    assignedGroup: "Général",
+    assignedGroup: "g4",
     createdBy: "u2",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
   },
@@ -110,7 +126,7 @@ export const TASKS: Task[] = [
     locationId: "loc-c2",
     priority: "High",
     status: "Open",
-    assignedGroup: "Électricité",
+    assignedGroup: "g2",
     createdBy: "u4",
     createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
   }

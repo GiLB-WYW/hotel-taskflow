@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, Square, Camera, RotateCcw, Check, Loader2, Play, Pause } from "lucide-react";
-import { LOCATIONS, PRIORITIES } from "@/lib/mockData";
+import { LOCATIONS, PRIORITIES, MAINTENANCE_GROUPS } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
@@ -28,6 +28,7 @@ export default function CreateTask() {
     originalTranscript: "",
     priority: "Normal",
     locationId: "",
+    assignedGroup: "",
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -99,6 +100,7 @@ export default function CreateTask() {
         originalTranscript: "Uh, hi. I'm in Suite B2. The... the faucet in the bathroom is leaking really bad. It's the hot water one. Needs fixing.",
         priority: "Normal",
         locationId: "loc-b2", // Auto-detected from context or metadata
+        assignedGroup: "g1", // Auto-detect: Plomberie for plumbing issues
       });
       setIsProcessing(false);
       setStep("review");
@@ -270,6 +272,20 @@ export default function CreateTask() {
                       </select>
                     </div>
                  </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Who Needs to Fix It?</label>
+                  <select 
+                    className="w-full p-2 bg-background rounded-md border border-border font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    value={formData.assignedGroup}
+                    onChange={(e) => setFormData({...formData, assignedGroup: e.target.value})}
+                  >
+                    <option value="">-- Select Group --</option>
+                    {MAINTENANCE_GROUPS.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} • {g.memberCount} members</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Description (Translated)</label>

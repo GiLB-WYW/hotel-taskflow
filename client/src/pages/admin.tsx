@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LOCATIONS, USERS } from "@/lib/mockData";
-import { Plus, Trash2, Edit, Search, UserPlus, MapPin } from "lucide-react";
+import { LOCATIONS, USERS, MAINTENANCE_GROUPS } from "@/lib/mockData";
+import { Plus, Trash2, Edit, Search, UserPlus, MapPin, Wrench } from "lucide-react";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("locations");
@@ -22,6 +22,11 @@ export default function Admin() {
     u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredGroups = MAINTENANCE_GROUPS.filter(g => 
+    g.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    g.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <Layout userRole="Admin">
       <div className="space-y-6">
@@ -33,9 +38,10 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="locations" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full md:w-[400px] grid-cols-2">
+          <TabsList className="grid w-full md:w-[600px] grid-cols-3">
             <TabsTrigger value="locations">Locations</TabsTrigger>
             <TabsTrigger value="users">Users & Roles</TabsTrigger>
+            <TabsTrigger value="groups">Maintenance Groups</TabsTrigger>
           </TabsList>
 
           <div className="mt-4 flex items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border">
@@ -50,7 +56,7 @@ export default function Admin() {
             </div>
             <Button className="bg-primary text-primary-foreground">
               <Plus className="h-4 w-4 mr-2" />
-              Add {activeTab === 'locations' ? 'Location' : 'User'}
+              Add {activeTab === 'locations' ? 'Location' : activeTab === 'users' ? 'User' : 'Group'}
             </Button>
           </div>
 
@@ -129,6 +135,57 @@ export default function Admin() {
                         </TableCell>
                         <TableCell>{user.role}</TableCell>
                         <TableCell>{user.group || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="groups" className="mt-4 animate-in fade-in duration-300">
+            <Card>
+              <CardHeader>
+                <CardTitle>Maintenance Groups</CardTitle>
+                <CardDescription>
+                  Manage maintenance teams and their specializations.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Group Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Members</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredGroups.map((group) => (
+                      <TableRow key={group.id}>
+                        <TableCell className="font-medium flex items-center gap-2">
+                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                            <Wrench className="h-4 w-4 text-primary" />
+                          </div>
+                          {group.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{group.description}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/50 text-secondary-foreground">
+                            {group.memberCount} members
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="icon" className="h-8 w-8">

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MapPin, Clock, AlertTriangle, ArrowRight, User as UserIcon } from "lucide-react";
-import { Task, PRIORITIES, USERS, LOCATIONS } from "@/lib/mockData";
+import { Task, PRIORITIES, USERS, LOCATIONS, MAINTENANCE_GROUPS } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
   const priorityConfig = PRIORITIES[task.priority];
   const location = LOCATIONS.find(l => l.id === task.locationId);
   const assignedUser = USERS.find(u => u.id === task.assignedTo);
+  const assignedGroup = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup);
 
   return (
     <Card 
@@ -61,25 +62,32 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
           {task.description}
         </p>
       </CardContent>
-      <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-border/50 bg-muted/20 mt-2 py-2">
-        <div className="flex items-center gap-2">
-          {assignedUser ? (
-            <div className="flex items-center gap-1.5" title={`Assigned to ${assignedUser.name}`}>
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="text-[9px]">{assignedUser.avatar}</AvatarFallback>
-              </Avatar>
-              <span className="text-xs text-muted-foreground">{assignedUser.name}</span>
-            </div>
-          ) : (
-            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
-              Unassigned
-            </Badge>
-          )}
+      <CardFooter className="p-4 pt-0 flex flex-col gap-2 border-t border-border/50 bg-muted/20 mt-2 py-2">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            {assignedUser ? (
+              <div className="flex items-center gap-1.5" title={`Assigned to ${assignedUser.name}`}>
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback className="text-[9px]">{assignedUser.avatar}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs text-muted-foreground">{assignedUser.name}</span>
+              </div>
+            ) : (
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
+                Unassigned
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center text-xs text-muted-foreground">
+            <Clock className="h-3 w-3 mr-1" />
+            {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
+          </div>
         </div>
-        <div className="flex items-center text-xs text-muted-foreground">
-          <Clock className="h-3 w-3 mr-1" />
-          {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
-        </div>
+        {assignedGroup && (
+          <Badge className="w-fit text-[10px] h-5 px-2 font-medium bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+            {assignedGroup.name}
+          </Badge>
+        )}
       </CardFooter>
     </Card>
   );
