@@ -11,10 +11,38 @@ async function seed() {
     await db.delete(locationsTable);
     await db.delete(usersTable);
 
-    // Seed users
+    // Seed users with hashed passwords
+    const bcrypt = await import("bcrypt");
+    const TEMP_PASSWORD = "Welcome123!"; // Temporary password for all admin users
+    const hashedPassword = await bcrypt.hash(TEMP_PASSWORD, 10);
+
     const users = await db
       .insert(usersTable)
       .values([
+        {
+          name: "Gilles",
+          email: "gilles@toileblanche.com",
+          password: hashedPassword,
+          role: "Admin",
+          authProvider: "email",
+          avatar: "GL",
+        },
+        {
+          name: "Nicolas",
+          email: "nicolas@toileblanche.com",
+          password: hashedPassword,
+          role: "Admin",
+          authProvider: "email",
+          avatar: "NI",
+        },
+        {
+          name: "Gregory",
+          email: "gregory@toileblanche.com",
+          password: hashedPassword,
+          role: "Admin",
+          authProvider: "email",
+          avatar: "GR",
+        },
         {
           name: "Jean Dupont",
           email: "jean@hotel.com",
@@ -45,6 +73,11 @@ async function seed() {
         },
       ])
       .returning();
+
+    console.log("✅ Admin users created:");
+    console.log("  - gilles@toileblanche.com (password: Welcome123!)");
+    console.log("  - nicolas@toileblanche.com (password: Welcome123!)");
+    console.log("  - gregory@toileblanche.com (password: Welcome123!)");
 
     // Seed locations
     const locations = await db
