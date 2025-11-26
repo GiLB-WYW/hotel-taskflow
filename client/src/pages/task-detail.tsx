@@ -209,7 +209,7 @@ export default function TaskDetail() {
               {task.imageUrl && (
                 <div style={{ marginBottom: '16px' }}>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Evidence Photo</p>
-                  <img src={task.imageUrl} alt="Task Evidence" style={{ width: '100%', maxHeight: '384px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+                  <img src={task.imageUrl} alt="Task Evidence" style={{ width: '300px', height: '300px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #d1d5db' }} />
                 </div>
               )}
             </div>
