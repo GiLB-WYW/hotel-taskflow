@@ -21,16 +21,12 @@ export default function Dashboard() {
   // Get unique location categories
   const locationCategories = Array.from(new Set(LOCATIONS.map(loc => loc.category)));
 
-  // Get current user from localStorage and fetch full details
+  // Get current user from localStorage
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       const userData = JSON.parse(userStr);
-      // Fetch full user details from API to get role and group
-      fetch(`/api/users/${userData.id}`)
-        .then(res => res.json())
-        .then(user => setCurrentUser(user))
-        .catch(err => console.error("Failed to fetch user details:", err));
+      setCurrentUser(userData as User);
     }
   }, []);
 

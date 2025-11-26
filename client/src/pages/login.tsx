@@ -58,11 +58,13 @@ export default function Login() {
         return;
       }
 
-      // Store user data
+      // Store user data including role and group
       localStorage.setItem("user", JSON.stringify({
         id: data.id,
         email: data.email,
         name: data.name,
+        role: data.role,
+        group: data.group,
         provider: data.authProvider || "email",
         avatar: data.avatar || email[0].toUpperCase(),
       }));
