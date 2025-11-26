@@ -8,14 +8,18 @@ import {
   type InsertMaintenanceGroup,
   type Task,
   type InsertTask,
+  type Note,
+  type InsertNote,
   usersTable,
   locationsTable,
   maintenanceGroupsTable,
   tasksTable,
+  notesTable,
   insertUserSchema,
   insertLocationSchema,
   insertMaintenanceGroupSchema,
   insertTaskSchema,
+  insertNoteSchema,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { ZodError } from "zod";
@@ -58,6 +62,10 @@ export interface IStorage {
     endDate?: Date;
   }): Promise<Task[]>;
   listTasksByLocation(locationId: string, startDate?: Date, endDate?: Date): Promise<Task[]>;
+
+  // Notes
+  createNote(note: InsertNote): Promise<Note>;
+  listNotesByTask(taskId: string): Promise<Note[]>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -218,6 +226,20 @@ export class PostgresStorage implements IStorage {
       startDate,
       endDate,
     });
+  }
+
+  async createNote(data: InsertNote): Promise<Note> {
+    const validated = insertNoteSchema.parse(data);
+    const note = await db.insert(notesTable).values(validated).returning();
+    return note[0];
+  }
+
+  async listNotesByTask(taskId: string): Promise<Note[]> {
+    const notes = await db.select()
+      .from(notesTable)
+      .where(eq(notesTable.taskId, taskId))
+      .orderBy(desc(notesTable.createdAt));
+    return notes;
   }
 }
 

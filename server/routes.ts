@@ -246,6 +246,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notes routes
+  app.post("/api/tasks/:taskId/notes", async (req, res) => {
+    try {
+      const { content, createdBy, recipients } = req.body;
+      const noteData = {
+        taskId: req.params.taskId,
+        content,
+        createdBy,
+        recipients: recipients || [],
+      };
+      const note = await storage.createNote(noteData);
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.get("/api/tasks/:taskId/notes", async (req, res) => {
+    try {
+      const notes = await storage.listNotesByTask(req.params.taskId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
   // Maintenance Groups routes
   app.get("/api/maintenance-groups", async (req, res) => {
     try {
