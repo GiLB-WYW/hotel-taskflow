@@ -181,8 +181,6 @@ export class PostgresStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<Task[]> {
-    let query = db.select().from(tasksTable);
-
     const conditions = [];
     if (filters?.locationId) {
       conditions.push(eq(tasksTable.locationId, filters.locationId));
@@ -201,10 +199,16 @@ export class PostgresStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      const tasks = await db.select()
+        .from(tasksTable)
+        .where(and(...conditions))
+        .orderBy(desc(tasksTable.createdAt));
+      return tasks;
     }
 
-    const tasks = await query.orderBy(desc(tasksTable.createdAt));
+    const tasks = await db.select()
+      .from(tasksTable)
+      .orderBy(desc(tasksTable.createdAt));
     return tasks;
   }
 

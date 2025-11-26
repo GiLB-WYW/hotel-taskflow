@@ -229,69 +229,72 @@ export default function CreateTask() {
     }
   };
 
-  const submitTask = async () => {
+  const submitTask = () => {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
-    try {
-      const userStr = localStorage.getItem("user");
-      if (!userStr) {
+    
+    setTimeout(async () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (!userStr) {
+          toast({
+            title: "Not authenticated",
+            description: "Please log in to create tasks.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const user = JSON.parse(userStr);
+
+        const taskData = {
+          title: formData.title,
+          description: formData.description,
+          originalTranscript: formData.originalTranscript,
+          locationId: formData.locationId,
+          priority: formData.priority,
+          assignedGroup: formData.assignedGroup,
+          imageUrl: photo,
+          createdBy: user.id,
+        };
+
+        console.log("Submitting task:", { ...taskData, imageUrl: photo ? `[image: ${photo.substring(0, 50)}...]` : null });
+
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(taskData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          console.error("Server error:", errorData);
+          throw new Error(errorData.error || "Failed to create task");
+        }
+
+        const result = await response.json();
+        console.log("Task created successfully:", result);
+
         toast({
-          title: "Not authenticated",
-          description: "Please log in to create tasks.",
+          title: "Task Created Successfully",
+          description: "The maintenance team has been notified.",
+        });
+        setStep("success");
+        setTimeout(() => navigate("/"), 2000);
+      } catch (error) {
+        console.error("Submit task error:", error);
+        toast({
+          title: "Failed to Create Task",
+          description: error instanceof Error ? error.message : "Please try again.",
           variant: "destructive",
         });
         setIsSubmitting(false);
-        return;
       }
-
-      const user = JSON.parse(userStr);
-
-      const taskData = {
-        title: formData.title,
-        description: formData.description,
-        originalTranscript: formData.originalTranscript,
-        locationId: formData.locationId,
-        priority: formData.priority,
-        assignedGroup: formData.assignedGroup,
-        imageUrl: photo,
-        createdBy: user.id,
-      };
-
-      console.log("Submitting task:", { ...taskData, imageUrl: photo ? `[image: ${photo.substring(0, 50)}...]` : null });
-
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(taskData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("Server error:", errorData);
-        throw new Error(errorData.error || "Failed to create task");
-      }
-
-      const result = await response.json();
-      console.log("Task created successfully:", result);
-
-      toast({
-        title: "Task Created Successfully",
-        description: "The maintenance team has been notified.",
-      });
-      setStep("success");
-      setTimeout(() => navigate("/"), 2000);
-    } catch (error) {
-      console.error("Submit task error:", error);
-      toast({
-        title: "Failed to Create Task",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-    }
+    }, 0);
   };
 
   return (

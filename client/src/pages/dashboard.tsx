@@ -82,10 +82,16 @@ export default function Dashboard() {
     return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory;
   });
 
-  // Sort by Priority (Red Flag first)
+  // Sort by Priority (Red Flag first), then by creation date (newest first)
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     const priorityOrder = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+    const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+    
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   const redFlagCount = tasks.filter(t => t.priority === "Red Flag").length;
