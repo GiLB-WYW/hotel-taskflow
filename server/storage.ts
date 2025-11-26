@@ -43,11 +43,13 @@ export interface IStorage {
   getLocation(id: string): Promise<Location | undefined>;
   getLocationByCode(code: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
+  updateLocation(id: string, updates: Partial<InsertLocation>): Promise<Location>;
   listLocations(): Promise<Location[]>;
 
   // Maintenance Groups
   getMaintenanceGroup(id: string): Promise<MaintenanceGroup | undefined>;
   createMaintenanceGroup(group: InsertMaintenanceGroup): Promise<MaintenanceGroup>;
+  updateMaintenanceGroup(id: string, updates: Partial<InsertMaintenanceGroup>): Promise<MaintenanceGroup>;
   listMaintenanceGroups(): Promise<MaintenanceGroup[]>;
 
   // Tasks
@@ -144,6 +146,16 @@ export class PostgresStorage implements IStorage {
     return location[0];
   }
 
+  async updateLocation(id: string, updates: Partial<InsertLocation>): Promise<Location> {
+    const partialSchema = insertLocationSchema.partial();
+    const validated = partialSchema.parse(updates);
+    const location = await db.update(locationsTable)
+      .set(validated)
+      .where(eq(locationsTable.id, id))
+      .returning();
+    return location[0];
+  }
+
   async listLocations(): Promise<Location[]> {
     return await db.select().from(locationsTable);
   }
@@ -156,6 +168,16 @@ export class PostgresStorage implements IStorage {
   async createMaintenanceGroup(data: InsertMaintenanceGroup): Promise<MaintenanceGroup> {
     const validated = insertMaintenanceGroupSchema.parse(data);
     const group = await db.insert(maintenanceGroupsTable).values(validated).returning();
+    return group[0];
+  }
+
+  async updateMaintenanceGroup(id: string, updates: Partial<InsertMaintenanceGroup>): Promise<MaintenanceGroup> {
+    const partialSchema = insertMaintenanceGroupSchema.partial();
+    const validated = partialSchema.parse(updates);
+    const group = await db.update(maintenanceGroupsTable)
+      .set(validated)
+      .where(eq(maintenanceGroupsTable.id, id))
+      .returning();
     return group[0];
   }
 

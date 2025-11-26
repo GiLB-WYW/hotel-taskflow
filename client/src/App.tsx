@@ -10,6 +10,8 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import CreateTask from "@/pages/create-task";
 import Admin from "@/pages/admin";
+import AdminLocations from "@/pages/admin-locations";
+import AdminGroups from "@/pages/admin-groups";
 import TaskDetail from "@/pages/task-detail";
 import LocationDetail from "@/pages/location-detail";
 import ResetPassword from "@/pages/reset-password";
@@ -31,6 +33,8 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Route path="/create-task" component={CreateTask} />
       <Route path="/tasks" component={Dashboard} />
       <Route path="/admin" component={Admin} />
+      <Route path="/admin/locations" component={AdminLocations} />
+      <Route path="/admin/groups" component={AdminGroups} />
       <Route path="/task/:id" component={TaskDetail} />
       <Route path="/location/:id" component={LocationDetail} />
       <Route component={NotFound} />

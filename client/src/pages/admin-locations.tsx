@@ -1,0 +1,267 @@
+import { useState } from "react";
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Edit } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface Location {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+}
+
+const CATEGORIES = ["Restaurant", "Suites B", "Suites C", "Technique"];
+
+export default function AdminLocations() {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [formData, setFormData] = useState({ name: "", code: "", category: "" });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: locations = [], isLoading } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; code: string; category: string }) => {
+      const response = await fetch("/api/locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to create location");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({ title: "Location Created", description: "New location has been added." });
+      setIsAddDialogOpen(false);
+      setFormData({ name: "", code: "", category: "" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create location.", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Location> }) => {
+      const response = await fetch(`/api/locations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update location");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({ title: "Location Updated", description: "Location has been updated." });
+      setIsEditDialogOpen(false);
+      setEditingLocation(null);
+      setFormData({ name: "", code: "", category: "" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update location.", variant: "destructive" });
+    },
+  });
+
+  const handleAdd = () => {
+    if (!formData.name || !formData.code || !formData.category) {
+      toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate(formData);
+  };
+
+  const handleEdit = () => {
+    if (!editingLocation || !formData.name || !formData.code || !formData.category) {
+      toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({ id: editingLocation.id, data: formData });
+  };
+
+  const openEditDialog = (location: Location) => {
+    setEditingLocation(location);
+    setFormData({ name: location.name, code: location.code, category: location.category });
+    setIsEditDialogOpen(true);
+  };
+
+  const openAddDialog = () => {
+    setFormData({ name: "", code: "", category: "" });
+    setIsAddDialogOpen(true);
+  };
+
+  return (
+    <Layout>
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Manage Locations</h1>
+          <Button onClick={openAddDialog} data-testid="button-add-location">
+            <Plus className="h-4 w-4 mr-2" /> Add Location
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>All Locations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <p className="text-muted-foreground text-center py-8">Loading locations...</p>
+            ) : locations.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No locations found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-semibold">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold">Category</th>
+                      <th className="text-left py-3 px-4 font-semibold">Code</th>
+                      <th className="text-right py-3 px-4 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locations.map((location) => (
+                      <tr key={location.id} className="border-b hover:bg-muted/50" data-testid={`row-location-${location.id}`}>
+                        <td className="py-3 px-4">{location.name}</td>
+                        <td className="py-3 px-4">{location.category}</td>
+                        <td className="py-3 px-4 font-mono text-sm">{location.code}</td>
+                        <td className="py-3 px-4 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(location)}
+                            data-testid={`button-edit-location-${location.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Add Location Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent data-testid="dialog-add-location">
+          <DialogHeader>
+            <DialogTitle>Add New Location</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="add-name">Location Name</Label>
+              <Input
+                id="add-name"
+                data-testid="input-add-location-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Suite B1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-code">Location Code</Label>
+              <Input
+                id="add-code"
+                data-testid="input-add-location-code"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="e.g., sb1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-category">Category</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <SelectTrigger data-testid="select-add-location-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAdd} disabled={createMutation.isPending} data-testid="button-submit-add-location">
+              {createMutation.isPending ? "Adding..." : "Add Location"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Location Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent data-testid="dialog-edit-location">
+          <DialogHeader>
+            <DialogTitle>Edit Location</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Location Name</Label>
+              <Input
+                id="edit-name"
+                data-testid="input-edit-location-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-code">Location Code</Label>
+              <Input
+                id="edit-code"
+                data-testid="input-edit-location-code"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Category</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <SelectTrigger data-testid="select-edit-location-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEdit} disabled={updateMutation.isPending} data-testid="button-submit-edit-location">
+              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Layout>
+  );
+}

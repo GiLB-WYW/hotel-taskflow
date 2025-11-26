@@ -490,11 +490,22 @@ export default function Admin() {
 
           <TabsContent value="locations" className="mt-4 animate-in fade-in duration-300">
             <Card>
-              <CardHeader>
-                <CardTitle>Hotel Locations</CardTitle>
-                <CardDescription>
-                  Manage all trackable areas in the hotel structure.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>Hotel Locations</CardTitle>
+                  <CardDescription>
+                    Manage all trackable areas in the hotel structure.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setPageLocation("/admin/locations")}
+                  className="gap-2"
+                  data-testid="button-manage-locations"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Manage Locations
+                </Button>
               </CardHeader>
               <CardContent>
                 {locationsLoading ? (
@@ -611,11 +622,22 @@ export default function Admin() {
 
           <TabsContent value="groups" className="mt-4 animate-in fade-in duration-300">
             <Card>
-              <CardHeader>
-                <CardTitle>Maintenance Groups</CardTitle>
-                <CardDescription>
-                  Manage maintenance teams and their specializations.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>Maintenance Groups</CardTitle>
+                  <CardDescription>
+                    Manage maintenance teams and their specializations.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setPageLocation("/admin/groups")}
+                  className="gap-2"
+                  data-testid="button-manage-groups"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Manage Groups
+                </Button>
               </CardHeader>
               <CardContent>
                 {groupsLoading ? (

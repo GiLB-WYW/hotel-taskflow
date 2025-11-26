@@ -184,6 +184,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/locations/:id", async (req, res) => {
+    try {
+      const partialSchema = insertLocationSchema.partial();
+      const data = partialSchema.parse(req.body);
+      const location = await storage.updateLocation(req.params.id, data);
+      res.json(location);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update location" });
+    }
+  });
+
   // Task routes
   app.get("/api/tasks", async (req, res) => {
     try {
@@ -307,6 +321,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.errors });
       }
       res.status(500).json({ error: "Failed to create maintenance group" });
+    }
+  });
+
+  app.patch("/api/maintenance-groups/:id", async (req, res) => {
+    try {
+      const partialSchema = insertMaintenanceGroupSchema.partial();
+      const data = partialSchema.parse(req.body);
+      const group = await storage.updateMaintenanceGroup(req.params.id, data);
+      res.json(group);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update maintenance group" });
     }
   });
 
