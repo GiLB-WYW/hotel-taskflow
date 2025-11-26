@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LOCATIONS, USERS, PRIORITIES, Task, MAINTENANCE_GROUPS } from "@/lib/mockData";
-import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { AddNoteDialog } from "@/components/add-note-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Note {
   id: string;
@@ -23,12 +26,35 @@ interface Note {
   recipients: string[];
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+}
+
+interface MaintenanceGroup {
+  id: string;
+  name: string;
+}
+
 export default function TaskDetail() {
   const [, params] = useRoute("/task/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+  const [isAssignUserDialogOpen, setIsAssignUserDialogOpen] = useState(false);
+  const [isChangeLocationDialogOpen, setIsChangeLocationDialogOpen] = useState(false);
+  const [isChangeGroupDialogOpen, setIsChangeGroupDialogOpen] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const queryClient = useQueryClient();
   
   // Get current user from localStorage
@@ -44,6 +70,36 @@ export default function TaskDetail() {
   const { data: notes = [], refetch: refetchNotes } = useQuery<Note[]>({
     queryKey: [`/api/tasks/${params?.id}/notes`],
     enabled: !!params?.id,
+  });
+
+  // Fetch users, locations, and groups from API
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const { data: maintenanceGroups = [] } = useQuery<MaintenanceGroup[]>({
+    queryKey: ["/api/maintenance-groups"],
+  });
+
+  // Mutation to update task
+  const updateTaskMutation = useMutation({
+    mutationFn: async (updates: Partial<Task>) => {
+      const response = await fetch(`/api/tasks/${params?.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) throw new Error("Failed to update task");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${params?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
   });
 
   // Mutation to mark task as resolved
@@ -73,6 +129,47 @@ export default function TaskDetail() {
       });
     },
   });
+
+  // Check if user can edit assignments (Admin or Manager)
+  const canEditAssignments = currentUser.role === "Admin" || currentUser.role === "Manager";
+
+  // Filter users based on search query
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+  );
+
+  // Handler functions
+  const handleAssignUser = async (userId: string) => {
+    try {
+      await updateTaskMutation.mutateAsync({ assignedTo: userId });
+      setIsAssignUserDialogOpen(false);
+      setUserSearchQuery("");
+      toast({ title: "Success", description: "User assigned to task." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to assign user.", variant: "destructive" });
+    }
+  };
+
+  const handleChangeLocation = async (locationId: string) => {
+    try {
+      await updateTaskMutation.mutateAsync({ locationId });
+      setIsChangeLocationDialogOpen(false);
+      toast({ title: "Success", description: "Location updated." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update location.", variant: "destructive" });
+    }
+  };
+
+  const handleChangeGroup = async (groupId: string) => {
+    try {
+      await updateTaskMutation.mutateAsync({ assignedGroup: groupId });
+      setIsChangeGroupDialogOpen(false);
+      toast({ title: "Success", description: "Assigned group updated." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update assigned group.", variant: "destructive" });
+    }
+  };
   
   if (isLoading) {
     return (
@@ -95,11 +192,12 @@ export default function TaskDetail() {
     );
   }
 
-  const location = LOCATIONS.find(l => l.id === task.locationId);
-  const creator = USERS.find(u => u.id === task.createdBy);
-  const assignee = USERS.find(u => u.id === task.assignedTo);
+  const location = locations.find(l => l.id === task.locationId) || LOCATIONS.find(l => l.id === task.locationId);
+  const creator = users.find(u => u.id === task.createdBy) || USERS.find(u => u.id === task.createdBy);
+  const assignee = users.find(u => u.id === task.assignedTo) || USERS.find(u => u.id === task.assignedTo);
   const priorityConfig = PRIORITIES[task.priority];
-  const assignedGroupName = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup)?.name || task.assignedGroup || "General";
+  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup) || MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
+  const assignedGroupName = assignedGroup?.name || task.assignedGroup || "General";
 
   const exportPDF = async () => {
     setIsExporting(true);
@@ -382,27 +480,57 @@ export default function TaskDetail() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm font-medium mb-2">Assigned Group</p>
-                  <Badge variant="secondary" className="text-sm w-full justify-center py-1">
-                    {assignedGroupName}
-                  </Badge>
+                  {canEditAssignments ? (
+                    <Button
+                      variant="secondary"
+                      className="text-sm w-full justify-center py-1"
+                      onClick={() => setIsChangeGroupDialogOpen(true)}
+                      data-testid="button-change-group"
+                    >
+                      {assignedGroupName}
+                    </Button>
+                  ) : (
+                    <Badge variant="secondary" className="text-sm w-full justify-center py-1">
+                      {assignedGroupName}
+                    </Badge>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-2">Assigned To</p>
                   {assignee ? (
-                    <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                        {assignee.avatar}
+                    canEditAssignments ? (
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start p-2"
+                        onClick={() => setIsAssignUserDialogOpen(true)}
+                        data-testid="button-change-assignee"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                            {'avatar' in assignee && assignee.avatar ? assignee.avatar : assignee.name?.[0] || '?'}
+                          </div>
+                          <span className="text-sm font-medium">{assignee.name}</span>
+                        </div>
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                          {'avatar' in assignee && assignee.avatar ? assignee.avatar : assignee.name?.[0] || '?'}
+                        </div>
+                        <span className="text-sm font-medium">{assignee.name}</span>
                       </div>
-                      <span className="text-sm font-medium">{assignee.name}</span>
-                    </div>
+                    )
                   ) : (
                      <Button 
                        variant="outline" 
                        className="w-full border-dashed text-muted-foreground"
-                       onClick={() => toast({
-                         title: "Assign Person",
-                         description: "Select a team member to assign this task.",
+                       onClick={() => canEditAssignments ? setIsAssignUserDialogOpen(true) : toast({
+                         title: "Permission Denied",
+                         description: "Only admins and managers can assign tasks.",
+                         variant: "destructive",
                        })}
+                       data-testid="button-assign-person"
+                       disabled={!canEditAssignments}
                      >
                        <User className="h-4 w-4 mr-2" />
                        Assign Person
@@ -507,6 +635,98 @@ export default function TaskDetail() {
         availableUsers={USERS}
         onNoteAdded={() => refetchNotes()}
       />
+
+      {/* Assign User Dialog */}
+      <Dialog open={isAssignUserDialogOpen} onOpenChange={setIsAssignUserDialogOpen}>
+        <DialogContent data-testid="dialog-assign-user">
+          <DialogHeader>
+            <DialogTitle>Assign Person to Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-user"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {filteredUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+              ) : (
+                filteredUsers.map((user) => (
+                  <Button
+                    key={user.id}
+                    variant="ghost"
+                    className="w-full justify-start hover:bg-muted"
+                    onClick={() => handleAssignUser(user.id)}
+                    data-testid={`button-select-user-${user.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {user.name[0] || user.email[0]}
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-medium">{user.name}</span>
+                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                      </div>
+                    </div>
+                  </Button>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Location Dialog */}
+      <Dialog open={isChangeLocationDialogOpen} onOpenChange={setIsChangeLocationDialogOpen}>
+        <DialogContent data-testid="dialog-change-location">
+          <DialogHeader>
+            <DialogTitle>Change Location</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Select onValueChange={handleChangeLocation}>
+              <SelectTrigger data-testid="select-location">
+                <SelectValue placeholder="Select a location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id} data-testid={`option-location-${loc.id}`}>
+                    {loc.name} ({loc.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Assigned Group Dialog */}
+      <Dialog open={isChangeGroupDialogOpen} onOpenChange={setIsChangeGroupDialogOpen}>
+        <DialogContent data-testid="dialog-change-group">
+          <DialogHeader>
+            <DialogTitle>Change Assigned Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Select onValueChange={handleChangeGroup}>
+              <SelectTrigger data-testid="select-group">
+                <SelectValue placeholder="Select a maintenance group" />
+              </SelectTrigger>
+              <SelectContent>
+                {maintenanceGroups.map((group) => (
+                  <SelectItem key={group.id} value={group.id} data-testid={`option-group-${group.id}`}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
