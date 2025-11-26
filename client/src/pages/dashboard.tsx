@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { TaskCard } from "@/components/ui/task-card";
-import { LOCATIONS, Task } from "@/lib/mockData";
+import { LOCATIONS, Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,13 +16,47 @@ export default function Dashboard() {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
   const [, setLocation] = useLocation();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Get unique location categories
   const locationCategories = Array.from(new Set(LOCATIONS.map(loc => loc.category)));
 
+  // Get current user from localStorage and fetch full details
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const userData = JSON.parse(userStr);
+      // Fetch full user details from API to get role and group
+      fetch(`/api/users/${userData.id}`)
+        .then(res => res.json())
+        .then(user => setCurrentUser(user))
+        .catch(err => console.error("Failed to fetch user details:", err));
+    }
+  }, []);
+
   // Fetch tasks from API
-  const { data: tasks = [], isLoading } = useQuery<Task[]>({
+  const { data: allTasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  // Filter tasks based on user role
+  const tasks = allTasks.filter(task => {
+    if (!currentUser) return true; // Show all if user not loaded yet
+    
+    // Admin sees everything
+    if (currentUser.role === "Admin") return true;
+    
+    // Manager sees all tasks from their group
+    if (currentUser.role === "Manager" && currentUser.group) {
+      return task.assignedGroup === currentUser.group;
+    }
+    
+    // Personnel and Basic Staff see only their own tasks
+    if (currentUser.role === "Personnel" || currentUser.role === "Basic Staff") {
+      return task.createdBy === currentUser.id || task.assignedTo === currentUser.id;
+    }
+    
+    return true;
   });
 
   // Filter Logic with Smart Search
@@ -73,6 +107,20 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 pb-32">
+        {/* Welcome Message */}
+        {currentUser && (
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 sm:p-6">
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary">
+              Welcome, {currentUser.group || currentUser.name}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {currentUser.role === "Admin" && "Viewing all tasks in the system"}
+              {currentUser.role === "Manager" && `Viewing all tasks for ${currentUser.group}`}
+              {(currentUser.role === "Personnel" || currentUser.role === "Basic Staff") && "Viewing your assigned tasks"}
+            </p>
+          </div>
+        )}
+
         {/* Stats Overview - Clickable Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           <div 

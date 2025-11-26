@@ -1,0 +1,42 @@
+## 📝 Prompting the Welcome/Dashboard Message
+
+Here is a structured prompt designed to clearly define the user-specific views and access permissions for the welcome screen or dashboard:
+
+---
+
+**Prompt Title:** **User Dashboard Access and Filtering Requirements**
+
+**Objective:** Define the logic for the initial welcome message and subsequent filtering of requests/tasks displayed on the main dashboard, ensuring that only relevant information is shown based on the user's role.
+
+### 1. Welcome Message Customization
+
+* **Requirement:** Upon successful login, the welcome message must be personalized.
+* **Format:** "Welcome, [**Employee Name / Group Name**]"
+
+### 2. Employee View (Standard User)
+
+* **Access:** Standard employees must have the most restricted view.
+* **Filtering Logic:** The dashboard **must only display requests/tasks that belong to the logged-in user.** (Tasks created by them, or tasks assigned directly to them.)
+* **Constraint:** Standard employees **must not** see requests or tasks belonging to other employees or groups.
+
+### 3. Manager View
+
+* **Access:** Managers require a group-level overview.
+* **Filtering Logic:** The dashboard **must display all active requests/tasks that belong to their specific group.** This includes tasks assigned to them, tasks they created, and tasks assigned to any employee within their managed group.
+
+### 4. Administrator View
+
+* **Access:** Administrators (Adminers) require full, unrestricted visibility.
+* **Filtering Logic:** The dashboard **must display every request and task** within the entire system, regardless of the assigned person or group.
+
+### Summary of Access Control (for Developer Review)
+
+| User Role | Welcome Message | Tasks Displayed |
+| :--- | :--- | :--- |
+| **Employee (Standard)** | Personal Name | **Only their own** requests/tasks. |
+| **Manager** | Group Name | **All tasks** within their managed group. |
+| **Administrator (Adminer)** | N/A (Full access implied) | **Everything** in the system. |
+
+---
+
+Would you like me to adapt this prompt for a specific platform (e.g., Jira, ServiceNow, etc.) or add any further details about task statuses?
