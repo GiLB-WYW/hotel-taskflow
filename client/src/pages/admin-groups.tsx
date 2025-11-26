@@ -5,14 +5,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Edit, Users } from "lucide-react";
 
 interface MaintenanceGroup {
   id: string;
   name: string;
-  members: number;
+  memberCount: number;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  group: string | null;
 }
 
 export default function AdminGroups() {
@@ -20,11 +29,16 @@ export default function AdminGroups() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<MaintenanceGroup | null>(null);
   const [formData, setFormData] = useState({ name: "", members: 0 });
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: groups = [], isLoading } = useQuery<MaintenanceGroup[]>({
     queryKey: ["/api/maintenance-groups"],
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const createMutation = useMutation({
@@ -64,9 +78,22 @@ export default function AdminGroups() {
       setIsEditDialogOpen(false);
       setEditingGroup(null);
       setFormData({ name: "", members: 0 });
+      setSelectedUserIds([]);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update group.", variant: "destructive" });
+    },
+  });
+
+  const updateUserGroupMutation = useMutation({
+    mutationFn: async ({ userId, groupId }: { userId: string; groupId: string | null }) => {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group: groupId }),
+      });
+      if (!response.ok) throw new Error("Failed to update user");
+      return response.json();
     },
   });
 
@@ -78,18 +105,64 @@ export default function AdminGroups() {
     createMutation.mutate(formData);
   };
 
-  const handleEdit = () => {
-    if (!editingGroup || !formData.name || formData.members < 0) {
-      toast({ title: "Validation Error", description: "Please provide valid group name and member count.", variant: "destructive" });
+  const handleEdit = async () => {
+    if (!editingGroup || !formData.name) {
+      toast({ title: "Validation Error", description: "Please provide a valid group name.", variant: "destructive" });
       return;
     }
-    updateMutation.mutate({ id: editingGroup.id, data: formData });
+
+    try {
+      // Update group name
+      await updateMutation.mutateAsync({ id: editingGroup.id, data: { name: formData.name } });
+
+      // Get users that were in this group before
+      const previousGroupMembers = users.filter(u => u.group === editingGroup.id);
+      const previousMemberIds = previousGroupMembers.map(u => u.id);
+
+      // Users to add (in selectedUserIds but not in previous)
+      const usersToAdd = selectedUserIds.filter(id => !previousMemberIds.includes(id));
+      
+      // Users to remove (in previous but not in selectedUserIds)
+      const usersToRemove = previousMemberIds.filter(id => !selectedUserIds.includes(id));
+
+      // Update user group assignments
+      const updatePromises = [
+        ...usersToAdd.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: editingGroup.id })),
+        ...usersToRemove.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: null })),
+      ];
+
+      await Promise.all(updatePromises);
+
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
+      
+      toast({ title: "Success", description: "Group and members updated successfully." });
+      setIsEditDialogOpen(false);
+      setEditingGroup(null);
+      setFormData({ name: "", members: 0 });
+      setSelectedUserIds([]);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update group.", variant: "destructive" });
+    }
   };
 
   const openEditDialog = (group: MaintenanceGroup) => {
     setEditingGroup(group);
-    setFormData({ name: group.name, members: group.members });
+    setFormData({ name: group.name, members: group.memberCount });
+    
+    // Pre-select users that belong to this group
+    const groupMembers = users.filter(u => u.group === group.id).map(u => u.id);
+    setSelectedUserIds(groupMembers);
+    
     setIsEditDialogOpen(true);
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   const openAddDialog = () => {
@@ -128,10 +201,12 @@ export default function AdminGroups() {
                     </tr>
                   </thead>
                   <tbody>
-                    {groups.map((group) => (
+                    {groups.map((group) => {
+                      const groupMemberCount = users.filter(u => u.group === group.id).length;
+                      return (
                       <tr key={group.id} className="border-b hover:bg-muted/50" data-testid={`row-group-${group.id}`}>
                         <td className="py-3 px-4 font-medium">{group.name}</td>
-                        <td className="py-3 px-4">{group.members}</td>
+                        <td className="py-3 px-4">{groupMemberCount}</td>
                         <td className="py-3 px-4 font-mono text-sm text-muted-foreground">{group.id}</td>
                         <td className="py-3 px-4 text-right">
                           <Button
@@ -144,7 +219,7 @@ export default function AdminGroups() {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -210,15 +285,42 @@ export default function AdminGroups() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-members">Number of Members</Label>
-              <Input
-                id="edit-members"
-                type="number"
-                data-testid="input-edit-group-members"
-                value={formData.members}
-                onChange={(e) => setFormData({ ...formData, members: parseInt(e.target.value) || 0 })}
-                min="0"
-              />
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Assign Users to Group
+              </Label>
+              <div className="border rounded-md p-3 max-h-[300px] overflow-y-auto space-y-2">
+                {users.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No users available</p>
+                ) : (
+                  users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded"
+                      data-testid={`user-option-${user.id}`}
+                    >
+                      <Checkbox
+                        id={`user-${user.id}`}
+                        checked={selectedUserIds.includes(user.id)}
+                        onCheckedChange={() => toggleUserSelection(user.id)}
+                        data-testid={`checkbox-user-${user.id}`}
+                      />
+                      <label
+                        htmlFor={`user-${user.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{user.name}</span>
+                          <span className="text-xs text-muted-foreground">{user.role}</span>
+                        </div>
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedUserIds.length} user{selectedUserIds.length !== 1 ? 's' : ''} selected
+              </p>
             </div>
           </div>
           <DialogFooter>
