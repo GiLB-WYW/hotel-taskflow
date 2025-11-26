@@ -134,28 +134,26 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#6F848E] via-[#ADB4A0] to-[#ac6b53] flex items-center justify-center px-4 py-8">
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-[#F0E4CE]/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-72 h-72 bg-[#f0e3df]/20 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-serif font-bold text-xl">H</span>
-            </div>
+          <div className="flex flex-col items-center justify-center gap-3 mb-4">
+            <img src="/hotel-logo.png" alt="Hotel Logo" className="h-24 w-auto object-contain" />
             <span className="font-serif font-bold text-3xl text-white">TaskFlow</span>
           </div>
-          <p className="text-slate-400 text-sm">Hôtel Task Management System</p>
+          <p className="text-[#F0E4CE] text-sm">Hôtel Task Management System</p>
         </div>
 
-        <Card className="border-0 shadow-2xl bg-slate-800/50 backdrop-blur-md">
+        <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-md">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-serif text-white">Welcome Back</CardTitle>
-            <CardDescription className="text-slate-300">
+            <CardTitle className="text-2xl font-serif text-[#6F848E]">Welcome Back</CardTitle>
+            <CardDescription className="text-[#ac6b53]">
               Sign in to your account to continue
             </CardDescription>
           </CardHeader>
@@ -164,40 +162,40 @@ export default function Login() {
             {/* Email/Password Form */}
             <form onSubmit={handleEmailLogin} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                <label className="text-xs font-semibold text-[#6F848E] uppercase tracking-wider">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#A6A6A6]" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                    className="pl-10 bg-[#FAFAFA] border-[#ADB4A0] text-[#6F848E] placeholder:text-[#A6A6A6] focus:border-[#ac6b53]"
                     disabled={isLoading}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                <label className="text-xs font-semibold text-[#6F848E] uppercase tracking-wider">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#A6A6A6]" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                    className="pl-10 pr-10 bg-[#FAFAFA] border-[#ADB4A0] text-[#6F848E] placeholder:text-[#A6A6A6] focus:border-[#ac6b53]"
                     disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A6A6A6] hover:text-[#6F848E] transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -210,7 +208,7 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold h-10 transition-all duration-300"
+                className="w-full bg-gradient-to-r from-[#6F848E] to-[#ADB4A0] hover:from-[#ac6b53] hover:to-[#6F848E] text-white font-semibold h-10 transition-all duration-300"
                 disabled={isLoading}
               >
                 {isLoading ? "Signing in..." : "Sign In with Email"}
@@ -220,10 +218,10 @@ export default function Login() {
             {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-600"></div>
+                <div className="w-full border-t border-[#ADB4A0]"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="px-2 bg-slate-800/50 text-slate-400 font-semibold">Or continue with</span>
+                <span className="px-2 bg-white/95 text-[#A6A6A6] font-semibold">Or continue with</span>
               </div>
             </div>
 
@@ -278,27 +276,27 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLocation("/reset-password")}
-                  className="text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                  className="text-xs text-[#6F848E] hover:text-[#ac6b53] hover:underline transition-colors"
                 >
                   Forgot your password?
                 </button>
               </div>
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-xs text-slate-300">
-                  <span className="font-semibold text-blue-400">Admin Users:</span>
+              <div className="p-3 bg-[#F0E4CE]/30 border border-[#ADB4A0]/40 rounded-lg">
+                <p className="text-xs text-[#6F848E]">
+                  <span className="font-semibold text-[#ac6b53]">Admin Users:</span>
                 </p>
-                <ul className="text-xs text-slate-400 mt-2 space-y-1">
+                <ul className="text-xs text-[#6F848E] mt-2 space-y-1">
                   <li>• gilles@toileblanche.com</li>
                   <li>• nicolas@toileblanche.com</li>
                   <li>• gregory@toileblanche.com</li>
-                  <li className="mt-2 text-slate-500">Default password: <span className="font-mono text-slate-300">Welcome123!</span></li>
+                  <li className="mt-2 text-[#A6A6A6]">Default password: <span className="font-mono text-[#6F848E]">Welcome123!</span></li>
                 </ul>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
+        <p className="text-center text-xs text-[#F0E4CE] mt-6">
           Hotel maintenance task management system
         </p>
       </div>
