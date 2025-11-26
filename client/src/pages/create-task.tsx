@@ -242,26 +242,35 @@ export default function CreateTask() {
 
       const user = JSON.parse(userStr);
 
+      const taskData = {
+        title: formData.title,
+        description: formData.description,
+        originalTranscript: formData.originalTranscript,
+        locationId: formData.locationId,
+        priority: formData.priority,
+        assignedGroup: formData.assignedGroup,
+        imageUrl: photo, // Send base64 image
+        createdBy: user.id,
+      };
+
+      console.log("Submitting task:", { ...taskData, imageUrl: photo ? `[image: ${photo.substring(0, 50)}...]` : null });
+
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          originalTranscript: formData.originalTranscript,
-          locationId: formData.locationId,
-          priority: formData.priority,
-          assignedGroup: formData.assignedGroup,
-          imageUrl: photo, // Send base64 image
-          createdBy: user.id,
-        }),
+        body: JSON.stringify(taskData),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create task");
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Server error:", errorData);
+        throw new Error(errorData.error || "Failed to create task");
       }
+
+      const result = await response.json();
+      console.log("Task created successfully:", result);
 
       toast({
         title: "Task Created Successfully",
@@ -270,9 +279,10 @@ export default function CreateTask() {
       setStep("success");
       setTimeout(() => navigate("/"), 2000);
     } catch (error) {
+      console.error("Submit task error:", error);
       toast({
         title: "Failed to Create Task",
-        description: "Please try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
     }

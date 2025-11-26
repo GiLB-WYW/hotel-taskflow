@@ -217,14 +217,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tasks", async (req, res) => {
     try {
+      console.log("Creating task with data:", { ...req.body, imageUrl: req.body.imageUrl ? `[image: ${req.body.imageUrl.substring(0, 50)}...]` : null });
       const data = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(data);
+      console.log("Task created successfully:", task.id);
       res.status(201).json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        console.error("Validation error:", error.errors);
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
-      res.status(500).json({ error: "Failed to create task" });
+      console.error("Error creating task:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task" });
     }
   });
 
