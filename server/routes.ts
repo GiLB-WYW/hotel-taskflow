@@ -121,12 +121,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/users/:id", async (req, res) => {
     try {
-      const { name, email, role, password } = req.body;
+      const { name, email, role, password, group } = req.body;
       const updates: any = {};
       
-      if (name) updates.name = name;
-      if (email) updates.email = email;
-      if (role) updates.role = role;
+      if (name !== undefined) updates.name = name;
+      if (email !== undefined) updates.email = email;
+      if (role !== undefined) updates.role = role;
+      if (group !== undefined) updates.group = group;
       
       const user = await storage.updateUser(req.params.id, updates);
       
