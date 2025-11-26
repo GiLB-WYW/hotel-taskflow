@@ -334,7 +334,7 @@ export default function TaskDetail() {
                 <div>
                   <p className="text-sm font-medium mb-2">Assigned Group</p>
                   <Badge variant="secondary" className="text-sm w-full justify-center py-1">
-                    {task.assignedGroup || "General"}
+                    {assignedGroupName}
                   </Badge>
                 </div>
                 <div>
