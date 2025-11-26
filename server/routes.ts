@@ -119,6 +119,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/users/:id", async (req, res) => {
+    try {
+      const { name, email, role, password } = req.body;
+      const updates: any = {};
+      
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (role) updates.role = role;
+      
+      const user = await storage.updateUser(req.params.id, updates);
+      
+      if (password) {
+        await storage.updatePassword(req.params.id, password);
+      }
+      
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      await storage.deleteUser(req.params.id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Location routes
   app.get("/api/locations", async (req, res) => {
     try {

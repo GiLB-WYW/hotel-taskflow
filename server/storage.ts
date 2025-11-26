@@ -30,6 +30,7 @@ export interface IStorage {
   getUserByAuthId(authProvider: string, authId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   updatePassword(userId: string, newPassword: string): Promise<void>;
   verifyPassword(userId: string, password: string): Promise<boolean>;
   listUsers(): Promise<User[]>;
@@ -94,6 +95,10 @@ export class PostgresStorage implements IStorage {
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
     const user = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     return user[0];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(usersTable).where(eq(usersTable.id, id));
   }
 
   async updatePassword(userId: string, newPassword: string): Promise<void> {
