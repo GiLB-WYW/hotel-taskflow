@@ -58,6 +58,7 @@ export default function TaskDetail() {
       // Create a new canvas from the page content
       const pdfContainer = document.getElementById("pdf-content");
       if (!pdfContainer) {
+        console.error("PDF container not found");
         toast({
           title: "Error",
           description: "Could not find content to export.",
@@ -67,21 +68,35 @@ export default function TaskDetail() {
         return;
       }
 
+      console.log("Starting PDF export...");
+      
       // Temporarily make visible for html2canvas
       pdfContainer.style.position = 'absolute';
       pdfContainer.style.left = '-9999px';
       pdfContainer.style.display = 'block';
 
+      console.log("Generating canvas...");
       const canvas = await html2canvas(pdfContainer, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#ffffff",
+        logging: false,
       });
+
+      console.log("Canvas generated, size:", canvas.width, "x", canvas.height);
 
       // Hide again
       pdfContainer.style.display = 'none';
 
+      console.log("Converting to image data...");
       const imgData = canvas.toDataURL("image/png");
+      
+      if (!imgData || imgData === "data:,") {
+        throw new Error("Failed to generate image data from canvas");
+      }
+
+      console.log("Creating PDF...");
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -93,30 +108,23 @@ export default function TaskDetail() {
       const imgWidth = pageWidth - 20;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      console.log("Adding image to PDF...");
+      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
 
-      pdf.addImage(imgData, "PNG", 10, position + 10, imgWidth, imgHeight);
-      heightLeft -= pageHeight - 20;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 10, position + 10, imgWidth, imgHeight);
-        heightLeft -= pageHeight - 20;
-      }
-
+      console.log("Saving PDF...");
       pdf.save(`Fiche_Technique_${task.id}.pdf`);
 
       toast({
         title: "PDF Downloaded",
         description: `Fiche technique for "${task.title}" has been downloaded.`,
       });
+      console.log("PDF export completed successfully");
     } catch (error) {
       console.error("PDF export error:", error);
+      console.error("Error details:", error instanceof Error ? error.message : "Unknown error");
       toast({
         title: "Export Failed",
-        description: "There was an error generating the PDF. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error generating the PDF. Please try again.",
         variant: "destructive",
       });
     } finally {
