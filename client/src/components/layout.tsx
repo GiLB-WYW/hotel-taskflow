@@ -109,14 +109,14 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
   );
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 border-r border-border bg-sidebar shadow-sm fixed inset-y-0 z-20">
         <NavContent />
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <main className="flex-1 md:ml-64 flex flex-col min-h-screen overflow-x-hidden">
         {/* Mobile Header */}
         <header className="md:hidden h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 px-4 flex items-center justify-between gap-2">
           <button 
@@ -168,8 +168,8 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
           </div>
         </header>
 
-        <div className="flex-1 p-3 sm:p-6 md:p-8 w-full animate-in fade-in duration-500 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <div className="flex-1 p-3 sm:p-6 md:p-8 w-full animate-in fade-in duration-500 overflow-y-auto overflow-x-hidden">
+          <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>
         </div>

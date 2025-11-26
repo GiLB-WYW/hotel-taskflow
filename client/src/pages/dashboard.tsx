@@ -102,7 +102,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6 pb-32">
+      <div className="space-y-4 sm:space-y-6 pb-32 w-full overflow-x-hidden">
         {/* Welcome Message */}
         {currentUser && (
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 sm:p-6">
@@ -179,9 +179,9 @@ export default function Dashboard() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 flex-shrink-0">
              <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm">
+              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -193,7 +193,7 @@ export default function Dashboard() {
             </Select>
 
             <Select value={locationCategoryFilter} onValueChange={setLocationCategoryFilter}>
-              <SelectTrigger className="w-32 sm:w-40 bg-background text-sm">
+              <SelectTrigger className="w-32 sm:w-40 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
               <SelectContent>
@@ -205,7 +205,7 @@ export default function Dashboard() {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm">
+              <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -217,7 +217,7 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
             
-            <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10">
+            <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10 flex-shrink-0">
               <ArrowUpDown className="h-4 w-4" />
             </Button>
           </div>
@@ -264,8 +264,9 @@ export default function Dashboard() {
       {/* Floating Action Button */}
       <button
         onClick={() => setLocation("/create-task")}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-40 group"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-50 group"
         data-testid="button-create-task-fab"
+        aria-label="Create New Task"
       >
         <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         <Plus className="h-6 sm:h-7 w-6 sm:w-7 relative z-10" />
