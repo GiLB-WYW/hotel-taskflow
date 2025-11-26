@@ -50,7 +50,7 @@ export default function TaskDetail() {
   const creator = USERS.find(u => u.id === task.createdBy);
   const assignee = USERS.find(u => u.id === task.assignedTo);
   const priorityConfig = PRIORITIES[task.priority];
-  const assignedGroupName = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup)?.name || task.assignedGroup || "General";
+  const assignedGroupName = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup)?.name || task.assignedGroup || "General";
 
   const exportPDF = async () => {
     setIsExporting(true);

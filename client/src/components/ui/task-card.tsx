@@ -16,7 +16,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
   const priorityConfig = PRIORITIES[task.priority];
   const location = LOCATIONS.find(l => l.id === task.locationId);
   const assignedUser = USERS.find(u => u.id === task.assignedTo);
-  const assignedGroup = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup);
+  const assignedGroup = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
 
   return (
     <Card 

@@ -496,7 +496,7 @@ export default function CreateTask() {
                   >
                     <option value="">-- Select Group --</option>
                     {MAINTENANCE_GROUPS.map(g => (
-                      <option key={g.id} value={g.id}>{g.name} • {g.memberCount} members</option>
+                      <option key={g.id} value={g.name}>{g.name} • {g.memberCount} members</option>
                     ))}
                   </select>
                 </div>
