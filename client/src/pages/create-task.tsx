@@ -18,6 +18,7 @@ export default function CreateTask() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [transcript, setTranscript] = useState("");
   const { toast } = useToast();
@@ -229,6 +230,9 @@ export default function CreateTask() {
   };
 
   const submitTask = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     try {
       const userStr = localStorage.getItem("user");
       if (!userStr) {
@@ -237,6 +241,7 @@ export default function CreateTask() {
           description: "Please log in to create tasks.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -249,7 +254,7 @@ export default function CreateTask() {
         locationId: formData.locationId,
         priority: formData.priority,
         assignedGroup: formData.assignedGroup,
-        imageUrl: photo, // Send base64 image
+        imageUrl: photo,
         createdBy: user.id,
       };
 
@@ -285,6 +290,7 @@ export default function CreateTask() {
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
+      setIsSubmitting(false);
     }
   };
 
@@ -515,9 +521,29 @@ export default function CreateTask() {
                 )}
 
                 <div className="pt-4 flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={() => setStep("capture")}>Cancel</Button>
-                  <Button className="flex-1 bg-primary hover:bg-primary/90 text-lg" onClick={submitTask}>
-                    Confirm & Create
+                  <Button 
+                    variant="outline" 
+                    className="flex-1" 
+                    onClick={() => setStep("capture")}
+                    disabled={isSubmitting}
+                    data-testid="button-cancel-task"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-primary hover:bg-primary/90 text-lg" 
+                    onClick={submitTask}
+                    disabled={isSubmitting}
+                    data-testid="button-submit-task"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Confirm & Create"
+                    )}
                   </Button>
                 </div>
               </CardContent>
