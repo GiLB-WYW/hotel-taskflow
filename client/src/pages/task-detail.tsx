@@ -4,11 +4,12 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TASKS, LOCATIONS, USERS, PRIORITIES, Task, MAINTENANCE_GROUPS } from "@/lib/mockData";
+import { LOCATIONS, USERS, PRIORITIES, Task, MAINTENANCE_GROUPS } from "@/lib/mockData";
 import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -18,7 +19,21 @@ export default function TaskDetail() {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
   
-  const task = TASKS.find(t => t.id === params?.id);
+  // Fetch task from API
+  const { data: task, isLoading } = useQuery<Task>({
+    queryKey: [`/api/tasks/${params?.id}`],
+    enabled: !!params?.id,
+  });
+  
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <p className="text-muted-foreground">Loading task...</p>
+        </div>
+      </Layout>
+    );
+  }
   
   if (!task) {
     return (
