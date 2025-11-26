@@ -67,11 +67,19 @@ export default function TaskDetail() {
         return;
       }
 
+      // Temporarily make visible for html2canvas
+      pdfContainer.style.position = 'absolute';
+      pdfContainer.style.left = '-9999px';
+      pdfContainer.style.display = 'block';
+
       const canvas = await html2canvas(pdfContainer, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
       });
+
+      // Hide again
+      pdfContainer.style.display = 'none';
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
