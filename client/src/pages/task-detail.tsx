@@ -12,17 +12,37 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { AddNoteDialog } from "@/components/add-note-dialog";
+
+interface Note {
+  id: string;
+  taskId: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+  recipients: string[];
+}
 
 export default function TaskDetail() {
   const [, params] = useRoute("/task/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  
+  // Get current user from localStorage
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   
   // Fetch task from API
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: [`/api/tasks/${params?.id}`],
+    enabled: !!params?.id,
+  });
+
+  // Fetch notes for this task
+  const { data: notes = [], refetch: refetchNotes } = useQuery<Note[]>({
+    queryKey: [`/api/tasks/${params?.id}/notes`],
     enabled: !!params?.id,
   });
 
@@ -411,10 +431,8 @@ export default function TaskDetail() {
             <div className="flex flex-col gap-2">
                <Button 
                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                 onClick={() => toast({
-                   title: "Add Note",
-                   description: "Note feature coming soon. You can add internal notes to this task.",
-                 })}
+                 onClick={() => setIsNoteDialogOpen(true)}
+                 data-testid="button-add-note"
                >
                  <MessageSquare className="h-4 w-4 mr-2" /> Add Note
                </Button>
@@ -429,9 +447,66 @@ export default function TaskDetail() {
                  {markResolvedMutation.isPending ? "Updating..." : task.status === "Resolved" ? "Already Resolved" : "Mark Resolved"}
                </Button>
             </div>
+
+            {/* Notes Section */}
+            {notes.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Activity Log</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {notes.map((note) => {
+                      const noteAuthor = USERS.find(u => u.id === note.createdBy);
+                      return (
+                        <div key={note.id} className="border-l-2 border-muted pl-4 py-2" data-testid={`note-${note.id}`}>
+                          <div className="flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                              {noteAuthor?.avatar || "?"}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-sm font-semibold">{noteAuthor?.name || "Unknown"}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(note.createdAt), "PPp")}
+                                </span>
+                              </div>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
+                              {note.recipients.length > 0 && (
+                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span>Notified:</span>
+                                  {note.recipients.map(recipientId => {
+                                    const recipient = USERS.find(u => u.id === recipientId);
+                                    return recipient ? (
+                                      <Badge key={recipientId} variant="outline" className="text-xs">
+                                        {recipient.name}
+                                      </Badge>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Add Note Dialog */}
+      <AddNoteDialog
+        open={isNoteDialogOpen}
+        onOpenChange={setIsNoteDialogOpen}
+        taskId={task.id}
+        currentUserId={currentUser.id}
+        availableUsers={USERS}
+        onNoteAdded={() => refetchNotes()}
+      />
     </Layout>
   );
 }
