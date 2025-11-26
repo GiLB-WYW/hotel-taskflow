@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Edit, Search, Wrench, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -25,11 +26,15 @@ export default function Admin() {
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Form states
   const [newLocation, setNewLocation] = useState({ name: "", category: "" });
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Basic Staff" as const });
   const [newGroup, setNewGroup] = useState({ name: "", description: "" });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState({ name: "", email: "", role: "", password: "" });
 
   // Fetch data from API
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -132,6 +137,62 @@ export default function Admin() {
     },
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; email?: string; role?: string; password?: string } }) => {
+      const response = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to update user");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsEditUserDialogOpen(false);
+      setEditingUser(null);
+      setEditUserForm({ name: "", email: "", role: "", password: "" });
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/users/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to delete user");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserToDelete(null);
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredLocations = locations.filter(l => 
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     l.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -181,6 +242,47 @@ export default function Admin() {
       return;
     }
     createGroupMutation.mutate(newGroup);
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditUserForm({
+      name: user.name,
+      email: (user as any).email || "",
+      role: user.role,
+      password: "",
+    });
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleUpdateUser = () => {
+    if (!editingUser) return;
+    
+    const updates: any = {};
+    if (editUserForm.name && editUserForm.name !== editingUser.name) updates.name = editUserForm.name;
+    if (editUserForm.email && editUserForm.email !== (editingUser as any).email) updates.email = editUserForm.email;
+    if (editUserForm.role && editUserForm.role !== editingUser.role) updates.role = editUserForm.role;
+    if (editUserForm.password) updates.password = editUserForm.password;
+
+    if (Object.keys(updates).length === 0) {
+      toast({
+        title: "No Changes",
+        description: "Please make some changes before saving",
+      });
+      return;
+    }
+
+    updateUserMutation.mutate({ id: editingUser.id, data: updates });
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setUserToDelete(user);
+  };
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      deleteUserMutation.mutate(userToDelete.id);
+    }
   };
 
   return (
@@ -459,6 +561,7 @@ export default function Admin() {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Group</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -473,6 +576,30 @@ export default function Admin() {
                           <TableCell className="text-muted-foreground">{(user as any).email || "-"}</TableCell>
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{user.group || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => handleEditUser(user)}
+                                title="Edit user"
+                                data-testid={`button-edit-user-${user.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteUser(user)}
+                                title="Delete user"
+                                data-testid={`button-delete-user-${user.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -526,6 +653,94 @@ export default function Admin() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>
+                Update user information and permissions.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-user-name">Full Name</Label>
+                <Input
+                  id="edit-user-name"
+                  value={editUserForm.name}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                  data-testid="input-edit-user-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-user-email">Email</Label>
+                <Input
+                  id="edit-user-email"
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                  data-testid="input-edit-user-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-user-role">Role</Label>
+                <Select value={editUserForm.role} onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}>
+                  <SelectTrigger id="edit-user-role" data-testid="select-edit-user-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Personnel">Personnel</SelectItem>
+                    <SelectItem value="Basic Staff">Basic Staff</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-user-password">New Password (optional)</Label>
+                <Input
+                  id="edit-user-password"
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={editUserForm.password}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })}
+                  data-testid="input-edit-user-password"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateUser} data-testid="button-submit-edit-user">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete User Confirmation */}
+        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete User</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {userToDelete?.name}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDeleteUser}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
