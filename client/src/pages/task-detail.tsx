@@ -136,91 +136,98 @@ export default function TaskDetail() {
     <Layout>
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Hidden content for PDF export */}
-        <div id="pdf-content" className="hidden">
-          <div className="bg-white p-12">
+        <div id="pdf-content" style={{ display: 'none' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '48px' }}>
             {/* PDF Header */}
-            <div className="mb-8 border-b-2 border-gray-300 pb-8">
-              <div className="flex justify-between items-start mb-6">
+            <div style={{ marginBottom: '32px', borderBottom: '2px solid #d1d5db', paddingBottom: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
-                  <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">{task.title}</h1>
-                  <p className="text-sm text-gray-600">Fiche Technique</p>
+                  <h1 style={{ fontSize: '36px', fontFamily: 'serif', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>{task.title}</h1>
+                  <p style={{ fontSize: '14px', color: '#4b5563' }}>Fiche Technique</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-700">Hôtel TaskFlow</p>
-                  <p className="text-xs text-gray-600">{format(new Date(), "PPP")}</p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Hôtel TaskFlow</p>
+                  <p style={{ fontSize: '12px', color: '#4b5563' }}>{format(new Date(), "PPP")}</p>
                 </div>
               </div>
 
               {/* Priority and Status Badges */}
-              <div className="flex gap-4">
-                <div className="inline-block">
-                  <span className="font-semibold text-xs text-gray-600 uppercase">Priority:</span>
-                  <p className={cn("font-bold text-lg mt-1", priorityConfig.color)}>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ display: 'inline-block' }}>
+                  <span style={{ fontWeight: '600', fontSize: '12px', color: '#4b5563', textTransform: 'uppercase' }}>Priority:</span>
+                  <p style={{ 
+                    fontWeight: 'bold', 
+                    fontSize: '18px', 
+                    marginTop: '4px',
+                    color: task.priority === 'Red Flag' ? '#dc2626' : 
+                           task.priority === 'High' ? '#ea580c' : 
+                           task.priority === 'Normal' ? '#2563eb' : '#16a34a'
+                  }}>
                     {task.priority}
                   </p>
                 </div>
-                <div className="inline-block">
-                  <span className="font-semibold text-xs text-gray-600 uppercase">Status:</span>
-                  <p className="font-bold text-lg mt-1 text-gray-900">{task.status}</p>
+                <div style={{ display: 'inline-block' }}>
+                  <span style={{ fontWeight: '600', fontSize: '12px', color: '#4b5563', textTransform: 'uppercase' }}>Status:</span>
+                  <p style={{ fontWeight: 'bold', fontSize: '18px', marginTop: '4px', color: '#111827' }}>{task.status}</p>
                 </div>
               </div>
             </div>
 
             {/* Task Details Section */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Task Information</h2>
-              <div className="grid grid-cols-2 gap-6 mb-6">
+            <div style={{ marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '16px' }}>Task Information</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Location</p>
-                  <p className="text-lg font-semibold text-gray-900">{location?.name}</p>
-                  <p className="text-sm text-gray-600">{location?.category}</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Location</p>
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>{location?.name}</p>
+                  <p style={{ fontSize: '14px', color: '#4b5563' }}>{location?.category}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Created</p>
-                  <p className="text-lg font-semibold text-gray-900">{format(new Date(task.createdAt), "PPP")}</p>
-                  <p className="text-sm text-gray-600">{format(new Date(task.createdAt), "p")}</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Created</p>
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>{format(new Date(task.createdAt), "PPP")}</p>
+                  <p style={{ fontSize: '14px', color: '#4b5563' }}>{format(new Date(task.createdAt), "p")}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Assigned Group</p>
-                  <p className="text-lg font-semibold text-gray-900">{assignedGroupName}</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assigned Group</p>
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>{assignedGroupName}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Created By</p>
-                  <p className="text-lg font-semibold text-gray-900">{creator?.name || "Unknown"}</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Created By</p>
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>{creator?.name || "Unknown"}</p>
                 </div>
               </div>
             </div>
 
             {/* Description Section */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Description</h2>
-              <p className="text-gray-800 leading-relaxed mb-4">{task.description}</p>
+            <div style={{ marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '16px' }}>Description</h2>
+              <p style={{ color: '#1f2937', lineHeight: '1.625', marginBottom: '16px' }}>{task.description}</p>
               
               {task.imageUrl && (
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Evidence Photo</p>
-                  <img src={task.imageUrl} alt="Task Evidence" className="w-full max-h-96 object-cover rounded border border-gray-300" />
+                <div style={{ marginBottom: '16px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Evidence Photo</p>
+                  <img src={task.imageUrl} alt="Task Evidence" style={{ width: '100%', maxHeight: '384px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #d1d5db' }} />
                 </div>
               )}
             </div>
 
             {/* Original Transcript Section */}
             {task.originalTranscript && (
-              <div className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Original Transcript</h2>
-                <p className="text-gray-700 italic bg-gray-100 p-4 rounded border-l-4 border-blue-500">
+              <div style={{ marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '16px' }}>Original Transcript</h2>
+                <p style={{ color: '#374151', fontStyle: 'italic', backgroundColor: '#f3f4f6', padding: '16px', borderRadius: '4px', borderLeft: '4px solid #3b82f6' }}>
                   "{task.originalTranscript}"
                 </p>
               </div>
             )}
 
             {/* Footer */}
-            <div className="border-t-2 border-gray-300 pt-6 mt-12 text-center text-xs text-gray-600">
+            <div style={{ borderTop: '2px solid #d1d5db', paddingTop: '24px', marginTop: '48px', textAlign: 'center', fontSize: '12px', color: '#4b5563' }}>
               <p>Document ID: {task.id} | Generated on {format(new Date(), "PPP 'at' p")}</p>
-              <p className="mt-2">Hôtel TaskFlow Management System</p>
+              <p style={{ marginTop: '8px' }}>Hôtel TaskFlow Management System</p>
             </div>
           </div>
         </div>
