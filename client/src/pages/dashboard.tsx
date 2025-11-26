@@ -14,8 +14,11 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [locationFilter, setLocationFilter] = useState("All");
+  const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
   const [, setLocation] = useLocation();
+
+  // Get unique location categories
+  const locationCategories = Array.from(new Set(LOCATIONS.map(loc => loc.category)));
 
   // Fetch tasks from API
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
@@ -38,9 +41,15 @@ export default function Dashboard() {
     
     const matchesStatus = statusFilter === "All" || task.status === statusFilter;
     const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
-    const matchesLocation = locationFilter === "All" || task.locationId === locationFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocation;
+    // Match by location category (e.g., "Suites B", "Restaurant", etc.)
+    let matchesLocationCategory = true;
+    if (locationCategoryFilter !== "All") {
+      const taskLocation = LOCATIONS.find(l => l.id === task.locationId);
+      matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
+    }
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory;
   });
 
   // Sort by Priority (Red Flag first)
@@ -139,14 +148,14 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <Select value={locationCategoryFilter} onValueChange={setLocationCategoryFilter}>
               <SelectTrigger className="w-32 sm:w-40 bg-background text-sm">
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Locations</SelectItem>
-                {LOCATIONS.map(loc => (
-                  <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                {locationCategories.map(category => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
