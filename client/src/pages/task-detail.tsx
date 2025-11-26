@@ -9,7 +9,7 @@ import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -18,11 +18,40 @@ export default function TaskDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+  const queryClient = useQueryClient();
   
   // Fetch task from API
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: [`/api/tasks/${params?.id}`],
     enabled: !!params?.id,
+  });
+
+  // Mutation to mark task as resolved
+  const markResolvedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/tasks/${params?.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Resolved" }),
+      });
+      if (!response.ok) throw new Error("Failed to update task");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "Task Marked Resolved",
+        description: "Task status has been updated to Resolved.",
+      });
+      setTimeout(() => setLocation("/"), 1000);
+    },
+    onError: () => {
+      toast({
+        title: "Update Failed",
+        description: "Could not update task status.",
+        variant: "destructive",
+      });
+    },
   });
   
   if (isLoading) {
@@ -392,12 +421,12 @@ export default function TaskDetail() {
                <Button 
                  variant="outline" 
                  className="w-full border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
-                 onClick={() => toast({
-                   title: "Task Marked Resolved",
-                   description: "Task status has been updated to Resolved.",
-                 })}
+                 onClick={() => markResolvedMutation.mutate()}
+                 disabled={markResolvedMutation.isPending || task.status === "Resolved"}
+                 data-testid="button-mark-resolved"
                >
-                 <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Resolved
+                 <CheckCircle2 className="h-4 w-4 mr-2" /> 
+                 {markResolvedMutation.isPending ? "Updating..." : task.status === "Resolved" ? "Already Resolved" : "Mark Resolved"}
                </Button>
             </div>
           </div>
