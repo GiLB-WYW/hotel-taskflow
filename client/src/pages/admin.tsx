@@ -575,149 +575,6 @@ export default function Admin() {
               </Dialog>
             )}
 
-            {activeTab === 'users' && (
-              <div className="flex gap-2">
-                <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary text-primary-foreground" data-testid="button-invite-user">
-                      <Mail className="h-4 w-4 mr-2" />
-                      Invite User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Invite New User</DialogTitle>
-                      <DialogDescription>
-                        Send an email invitation for a new user to join and set their own password.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="invite-name">Full Name</Label>
-                        <Input
-                          id="invite-name"
-                          placeholder="e.g., Jean Dupont"
-                          value={inviteForm.name}
-                          onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
-                          data-testid="input-invite-name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="invite-email">Email</Label>
-                        <Input
-                          id="invite-email"
-                          type="email"
-                          placeholder="jean@hotel.com"
-                          value={inviteForm.email}
-                          onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                          data-testid="input-invite-email"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="invite-role">Role</Label>
-                        <Select value={inviteForm.role} onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}>
-                          <SelectTrigger id="invite-role" data-testid="select-invite-role">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Manager">Manager</SelectItem>
-                            <SelectItem value="Personnel">Personnel</SelectItem>
-                            <SelectItem value="Basic Staff">Basic Staff</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleSendInvite} 
-                        disabled={sendInviteMutation.isPending}
-                        data-testid="button-send-invite"
-                      >
-                        {sendInviteMutation.isPending ? "Sending..." : "Send Invitation"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" data-testid="button-add-user">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add User Directly
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New User</DialogTitle>
-                      <DialogDescription>
-                        Create a new user account with a temporary password.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="user-name">Full Name</Label>
-                        <Input
-                          id="user-name"
-                          placeholder="e.g., Jean Dupont"
-                          value={newUser.name}
-                          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                          data-testid="input-user-name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="user-email">Email</Label>
-                        <Input
-                          id="user-email"
-                          type="email"
-                          placeholder="jean@hotel.com"
-                          value={newUser.email}
-                          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                          data-testid="input-user-email"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="user-password">Password</Label>
-                        <Input
-                          id="user-password"
-                          type="password"
-                          placeholder="Temporary password"
-                          value={newUser.password}
-                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                          data-testid="input-user-password"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="user-role">Role</Label>
-                        <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}>
-                          <SelectTrigger id="user-role" data-testid="select-user-role">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Manager">Manager</SelectItem>
-                            <SelectItem value="Personnel">Personnel</SelectItem>
-                            <SelectItem value="Basic Staff">Basic Staff</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleCreateUser} data-testid="button-submit-user">
-                        Create User
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            )}
-
             {activeTab === 'categories' && (
               <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
                 <DialogTrigger asChild>
@@ -958,11 +815,153 @@ export default function Admin() {
 
           <TabsContent value="users" className="mt-4 animate-in fade-in duration-300">
             <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  Manage staff access and roles.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>User Management</CardTitle>
+                  <CardDescription>
+                    Manage staff access and roles.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-primary text-primary-foreground" data-testid="button-invite-user">
+                        <Mail className="h-4 w-4 mr-2" />
+                        Invite User
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Invite New User</DialogTitle>
+                        <DialogDescription>
+                          Send an email invitation for a new user to join and set their own password.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-name">Full Name</Label>
+                          <Input
+                            id="invite-name"
+                            placeholder="e.g., Jean Dupont"
+                            value={inviteForm.name}
+                            onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+                            data-testid="input-invite-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-email">Email</Label>
+                          <Input
+                            id="invite-email"
+                            type="email"
+                            placeholder="jean@hotel.com"
+                            value={inviteForm.email}
+                            onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                            data-testid="input-invite-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-role">Role</Label>
+                          <Select value={inviteForm.role} onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}>
+                            <SelectTrigger id="invite-role" data-testid="select-invite-role">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Manager">Manager</SelectItem>
+                              <SelectItem value="Personnel">Personnel</SelectItem>
+                              <SelectItem value="Basic Staff">Basic Staff</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleSendInvite} 
+                          disabled={sendInviteMutation.isPending}
+                          data-testid="button-send-invite"
+                        >
+                          {sendInviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" data-testid="button-add-user">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add User
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New User</DialogTitle>
+                        <DialogDescription>
+                          Create a new user account with a temporary password.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="user-name">Full Name</Label>
+                          <Input
+                            id="user-name"
+                            placeholder="e.g., Jean Dupont"
+                            value={newUser.name}
+                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                            data-testid="input-user-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="user-email">Email</Label>
+                          <Input
+                            id="user-email"
+                            type="email"
+                            placeholder="jean@hotel.com"
+                            value={newUser.email}
+                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                            data-testid="input-user-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="user-password">Password</Label>
+                          <Input
+                            id="user-password"
+                            type="password"
+                            placeholder="Temporary password"
+                            value={newUser.password}
+                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                            data-testid="input-user-password"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="user-role">Role</Label>
+                          <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}>
+                            <SelectTrigger id="user-role" data-testid="select-user-role">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Manager">Manager</SelectItem>
+                              <SelectItem value="Personnel">Personnel</SelectItem>
+                              <SelectItem value="Basic Staff">Basic Staff</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleCreateUser} data-testid="button-submit-user">
+                          Create User
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 {usersLoading ? (
