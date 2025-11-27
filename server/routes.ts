@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertTaskSchema, insertLocationSchema, insertMaintenanceGroupSchema, insertCategorySchema } from "@shared/schema";
 import { z } from "zod";
+import { sendInvitationEmail } from "./email";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -147,6 +149,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "User deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Change password for logged-in users
+  app.post("/api/auth/change-password", async (req, res) => {
+    try {
+      const { userId, currentPassword, newPassword } = req.body;
+      
+      if (!userId || !newPassword) {
+        return res.status(400).json({ error: "User ID and new password required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // If user has a password, verify the current one
+      if (user.password && currentPassword) {
+        const isValid = await storage.verifyPassword(userId, currentPassword);
+        if (!isValid) {
+          return res.status(401).json({ error: "Current password is incorrect" });
+        }
+      }
+
+      await storage.updatePassword(userId, newPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  // Invitation routes
+  app.post("/api/invitations", async (req, res) => {
+    try {
+      const { email, name, role, invitedBy } = req.body;
+
+      if (!email || !name || !role || !invitedBy) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ error: "A user with this email already exists" });
+      }
+
+      // Check for pending invitation
+      const existingInvite = await storage.getInvitationByEmail(email);
+      if (existingInvite && !existingInvite.acceptedAt) {
+        return res.status(409).json({ error: "An invitation has already been sent to this email" });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Set expiry to 7 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Create invitation
+      const invitation = await storage.createInvitation({
+        email,
+        name,
+        role,
+        token,
+        invitedBy,
+        expiresAt,
+      });
+
+      // Get inviter info for email
+      const inviter = await storage.getUser(invitedBy);
+      const inviterName = inviter?.name || 'An administrator';
+
+      // Send invitation email
+      try {
+        await sendInvitationEmail(email, name, token, inviterName, role);
+      } catch (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        // Still return the invitation, but note the email issue
+        return res.status(201).json({ 
+          ...invitation, 
+          emailSent: false,
+          message: "Invitation created but email could not be sent"
+        });
+      }
+
+      res.status(201).json({ ...invitation, emailSent: true });
+    } catch (error) {
+      console.error('Failed to create invitation:', error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  app.get("/api/invitations/pending", async (req, res) => {
+    try {
+      const invitations = await storage.listPendingInvitations();
+      res.json(invitations);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  app.get("/api/invitations/:token", async (req, res) => {
+    try {
+      const invitation = await storage.getInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.acceptedAt) {
+        return res.status(400).json({ error: "Invitation has already been used" });
+      }
+
+      if (new Date() > new Date(invitation.expiresAt)) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      res.json(invitation);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invitation" });
+    }
+  });
+
+  app.post("/api/invitations/accept", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token and password required" });
+      }
+
+      const invitation = await storage.getInvitationByToken(token);
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.acceptedAt) {
+        return res.status(400).json({ error: "Invitation has already been used" });
+      }
+
+      if (new Date() > new Date(invitation.expiresAt)) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      // Create the user
+      const user = await storage.createUser({
+        email: invitation.email,
+        name: invitation.name,
+        role: invitation.role,
+        password,
+        authProvider: 'email',
+        avatar: invitation.name.substring(0, 2).toUpperCase(),
+      });
+
+      // Mark invitation as accepted
+      await storage.markInvitationAccepted(invitation.id);
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error('Failed to accept invitation:', error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  app.delete("/api/invitations/:id", async (req, res) => {
+    try {
+      await storage.deleteInvitation(req.params.id);
+      res.json({ message: "Invitation deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete invitation" });
     }
   });
 

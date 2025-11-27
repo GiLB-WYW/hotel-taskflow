@@ -71,6 +71,19 @@ export const notesTable = pgTable("notes", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// Invitations table
+export const invitationsTable = pgTable("invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  role: varchar("role").notNull().default("Basic Staff"),
+  token: varchar("token").notNull().unique(), // Unique invitation token
+  invitedBy: varchar("invited_by").notNull(), // Admin user ID who sent the invite
+  expiresAt: timestamp("expires_at").notNull(), // Invitation expiry
+  acceptedAt: timestamp("accepted_at"), // When the user accepted and created account
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
@@ -103,6 +116,11 @@ export const insertNoteSchema = createInsertSchema(notesTable).omit({
   createdAt: true,
 });
 
+export const insertInvitationSchema = createInsertSchema(invitationsTable).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select types
 export type User = typeof usersTable.$inferSelect;
 export type Category = typeof categoriesTable.$inferSelect;
@@ -110,6 +128,7 @@ export type Location = typeof locationsTable.$inferSelect;
 export type MaintenanceGroup = typeof maintenanceGroupsTable.$inferSelect;
 export type Task = typeof tasksTable.$inferSelect;
 export type Note = typeof notesTable.$inferSelect;
+export type Invitation = typeof invitationsTable.$inferSelect;
 
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -118,3 +137,4 @@ export type InsertLocation = z.infer<typeof insertLocationSchema>;
 export type InsertMaintenanceGroup = z.infer<typeof insertMaintenanceGroupSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;

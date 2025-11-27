@@ -12,18 +12,22 @@ import {
   type InsertTask,
   type Note,
   type InsertNote,
+  type Invitation,
+  type InsertInvitation,
   usersTable,
   categoriesTable,
   locationsTable,
   maintenanceGroupsTable,
   tasksTable,
   notesTable,
+  invitationsTable,
   insertUserSchema,
   insertCategorySchema,
   insertLocationSchema,
   insertMaintenanceGroupSchema,
   insertTaskSchema,
   insertNoteSchema,
+  insertInvitationSchema,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { ZodError } from "zod";
@@ -80,6 +84,14 @@ export interface IStorage {
   // Notes
   createNote(note: InsertNote): Promise<Note>;
   listNotesByTask(taskId: string): Promise<Note[]>;
+
+  // Invitations
+  createInvitation(invitation: InsertInvitation): Promise<Invitation>;
+  getInvitationByToken(token: string): Promise<Invitation | undefined>;
+  getInvitationByEmail(email: string): Promise<Invitation | undefined>;
+  markInvitationAccepted(id: string): Promise<Invitation>;
+  listPendingInvitations(): Promise<Invitation[]>;
+  deleteInvitation(id: string): Promise<void>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -308,6 +320,51 @@ export class PostgresStorage implements IStorage {
       .where(eq(notesTable.taskId, taskId))
       .orderBy(desc(notesTable.createdAt));
     return notes;
+  }
+
+  // Invitations
+  async createInvitation(data: InsertInvitation): Promise<Invitation> {
+    const validated = insertInvitationSchema.parse(data);
+    const invitation = await db.insert(invitationsTable).values(validated).returning();
+    return invitation[0];
+  }
+
+  async getInvitationByToken(token: string): Promise<Invitation | undefined> {
+    const invitation = await db.select().from(invitationsTable).where(eq(invitationsTable.token, token));
+    return invitation[0];
+  }
+
+  async getInvitationByEmail(email: string): Promise<Invitation | undefined> {
+    const invitation = await db.select()
+      .from(invitationsTable)
+      .where(and(
+        eq(invitationsTable.email, email),
+        gte(invitationsTable.expiresAt, new Date())
+      ))
+      .orderBy(desc(invitationsTable.createdAt));
+    return invitation[0];
+  }
+
+  async markInvitationAccepted(id: string): Promise<Invitation> {
+    const invitation = await db.update(invitationsTable)
+      .set({ acceptedAt: new Date() })
+      .where(eq(invitationsTable.id, id))
+      .returning();
+    return invitation[0];
+  }
+
+  async listPendingInvitations(): Promise<Invitation[]> {
+    const invitations = await db.select()
+      .from(invitationsTable)
+      .where(and(
+        gte(invitationsTable.expiresAt, new Date())
+      ))
+      .orderBy(desc(invitationsTable.createdAt));
+    return invitations.filter(inv => !inv.acceptedAt);
+  }
+
+  async deleteInvitation(id: string): Promise<void> {
+    await db.delete(invitationsTable).where(eq(invitationsTable.id, id));
   }
 }
 
