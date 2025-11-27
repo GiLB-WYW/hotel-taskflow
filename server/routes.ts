@@ -31,6 +31,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
       
+      console.log("Login attempt for:", email);
+      
       if (!email) {
         return res.status(400).json({ error: "Email required" });
       }
@@ -38,8 +40,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserByEmail(email);
       
       if (!user) {
+        console.log("User not found:", email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
+
+      console.log("User found:", user.email, "Has password:", !!user.password);
 
       // If user has a password, verify it
       if (user.password) {
@@ -47,7 +52,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Password required" });
         }
 
+        console.log("Verifying password for user:", user.id);
         const isValid = await storage.verifyPassword(user.id, password);
+        console.log("Password valid:", isValid);
+        
         if (!isValid) {
           return res.status(401).json({ error: "Invalid credentials" });
         }
@@ -55,8 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Don't send password hash to client
       const { password: _, ...userWithoutPassword } = user;
+      console.log("Login successful for:", email);
       res.json(userWithoutPassword);
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
   });

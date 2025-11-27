@@ -17,7 +17,12 @@ export default function Login() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password;
+    
+    console.log("Login attempt:", { email: trimmedEmail, passwordLength: trimmedPassword.length });
+    
+    if (!trimmedEmail || !trimmedPassword) {
       toast({
         title: "Required Fields",
         description: "Please enter both email and password.",
@@ -26,7 +31,7 @@ export default function Login() {
       return;
     }
 
-    if (!email.includes("@")) {
+    if (!trimmedEmail.includes("@")) {
       toast({
         title: "Invalid Email",
         description: "Please enter a valid email address.",
@@ -38,15 +43,18 @@ export default function Login() {
     setIsLoading(true);
     
     try {
+      console.log("Sending login request...");
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       });
 
+      console.log("Response status:", response.status);
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (!response.ok) {
         toast({

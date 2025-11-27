@@ -29,7 +29,7 @@ import {
   insertNoteSchema,
   insertInvitationSchema,
 } from "@shared/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 
@@ -103,7 +103,8 @@ export class PostgresStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await db.select().from(usersTable).where(sql`LOWER(${usersTable.email}) = ${normalizedEmail}`);
     return user[0];
   }
 
