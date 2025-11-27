@@ -16,6 +16,7 @@ import TaskDetail from "@/pages/task-detail";
 import LocationDetail from "@/pages/location-detail";
 import ResetPassword from "@/pages/reset-password";
 import AcceptInvite from "@/pages/accept-invite";
+import Settings from "@/pages/settings";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
@@ -39,6 +40,7 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Route path="/admin/groups" component={AdminGroups} />
       <Route path="/task/:id" component={TaskDetail} />
       <Route path="/location/:id" component={LocationDetail} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

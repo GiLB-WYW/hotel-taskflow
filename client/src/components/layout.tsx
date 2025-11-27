@@ -8,7 +8,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  Bell
+  Bell,
+  UserCog
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -91,22 +92,35 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-colors"
-          onClick={() => {
-            logout();
-            toast({
-              title: "Logged Out",
-              description: "You have been successfully logged out.",
-            });
-            setLocation("/");
-            window.location.reload();
-          }}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          <span className="truncate">Log Out</span>
-        </Button>
+        <div className="space-y-1">
+          <Link href="/settings">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setIsMobileMenuOpen(false)}
+              data-testid="button-settings"
+            >
+              <UserCog className="h-4 w-4 shrink-0" />
+              <span className="truncate">Account Settings</span>
+            </Button>
+          </Link>
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-colors"
+            onClick={() => {
+              logout();
+              toast({
+                title: "Logged Out",
+                description: "You have been successfully logged out.",
+              });
+              setLocation("/");
+              window.location.reload();
+            }}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className="truncate">Log Out</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
