@@ -9,12 +9,14 @@ import { Search, Filter, ArrowUpDown, AlertTriangle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { isToday } from "date-fns";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
+  const [resolvedTodayFilter, setResolvedTodayFilter] = useState(false);
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -55,6 +57,14 @@ export default function Dashboard() {
     return true;
   });
 
+  // Helper function to check if a task was resolved today
+  const isResolvedToday = (task: Task) => {
+    return task.status === "Resolved" && task.updatedAt && isToday(new Date(task.updatedAt));
+  };
+
+  // Calculate resolved today count dynamically
+  const resolvedTodayCount = tasks.filter(isResolvedToday).length;
+
   // Filter Logic with Smart Search
   const filteredTasks = tasks.filter(task => {
     const searchLower = searchQuery.toLowerCase();
@@ -78,8 +88,11 @@ export default function Dashboard() {
       const taskLocation = LOCATIONS.find(l => l.id === task.locationId);
       matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
     }
+
+    // If resolved today filter is active, only show tasks resolved today
+    const matchesResolvedToday = !resolvedTodayFilter || isResolvedToday(task);
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory;
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesResolvedToday;
   });
 
   // Sort by Priority (Red Flag first), then by creation date (newest first)
@@ -127,7 +140,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           <div 
             className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => setStatusFilter("Open")}
+            onClick={() => { setStatusFilter("Open"); setResolvedTodayFilter(false); }}
             data-testid="card-open-tasks"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open Tasks</p>
@@ -138,7 +151,7 @@ export default function Dashboard() {
           </div>
           <div 
             className="bg-card border border-red-200 bg-red-50/50 rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => setPriorityFilter("Red Flag")}
+            onClick={() => { setPriorityFilter("Red Flag"); setResolvedTodayFilter(false); setStatusFilter("All"); }}
             data-testid="card-critical"
           >
             <div className="flex items-center justify-between">
@@ -152,7 +165,7 @@ export default function Dashboard() {
           </div>
           <div 
             className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => setStatusFilter("In Progress")}
+            onClick={() => { setStatusFilter("In Progress"); setResolvedTodayFilter(false); }}
             data-testid="card-in-progress"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">In Progress</p>
@@ -162,13 +175,21 @@ export default function Dashboard() {
             </div>
           </div>
           <div 
-            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => setStatusFilter("Resolved")}
+            className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${resolvedTodayFilter ? 'border-green-400 bg-green-50/50' : 'border-border'}`}
+            onClick={() => {
+              if (resolvedTodayFilter) {
+                setResolvedTodayFilter(false);
+                setStatusFilter("All");
+              } else {
+                setResolvedTodayFilter(true);
+                setStatusFilter("Resolved");
+              }
+            }}
             data-testid="card-resolved"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Resolved Today</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
-              <span className="text-2xl sm:text-3xl font-bold text-green-600">12</span>
+              <span className="text-2xl sm:text-3xl font-bold text-green-600">{resolvedTodayCount}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">completed</span>
             </div>
           </div>
@@ -186,7 +207,7 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 flex-shrink-0">
-             <Select value={statusFilter} onValueChange={setStatusFilter}>
+             <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setResolvedTodayFilter(false); }}>
               <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>

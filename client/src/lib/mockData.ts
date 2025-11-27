@@ -51,6 +51,7 @@ export interface Task {
   assignedGroup?: string; // MaintenanceGroup ID or Group name
   createdBy: string; // User ID
   createdAt: string;
+  updatedAt?: string; // Last update timestamp
   imageUrl?: string;
 }
 
