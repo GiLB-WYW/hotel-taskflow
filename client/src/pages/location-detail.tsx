@@ -30,7 +30,11 @@ interface Task {
   createdAt: string;
 }
 
-const CATEGORIES = ["Restaurant", "Suites B", "Suites C", "Technique", "Building A", "Building B", "Building C", "Building D", "Building E", "Building F", "Building G", "Building H", "Building I", "Building J"];
+interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 const PRIORITIES: Record<string, { color: string }> = {
   "Red Flag": { color: "bg-red-100 text-red-800" },
@@ -66,6 +70,11 @@ export default function LocationDetail() {
   // Fetch tasks for this location
   const { data: allTasks = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  // Fetch categories for edit form
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
   });
 
   // Update form when location data loads
@@ -217,9 +226,9 @@ export default function LocationDetail() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

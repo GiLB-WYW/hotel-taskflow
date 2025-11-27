@@ -493,13 +493,21 @@ export default function Admin() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="location-category">Category</Label>
-                      <Input
-                        id="location-category"
-                        placeholder="e.g., Suites A, Restaurant, Technical"
-                        value={newLocation.category}
-                        onChange={(e) => setNewLocation({ ...newLocation, category: e.target.value })}
-                        data-testid="input-location-category"
-                      />
+                      <Select 
+                        value={newLocation.category} 
+                        onValueChange={(value) => setNewLocation({ ...newLocation, category: value })}
+                      >
+                        <SelectTrigger id="location-category" data-testid="select-location-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <DialogFooter>
