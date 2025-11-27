@@ -146,31 +146,92 @@ export default function CreateTask() {
     fileInputRef.current?.click();
   };
 
-  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compress and resize image to reduce database traffic
+  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          
+          // Calculate new dimensions maintaining aspect ratio
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to JPEG with compression
+          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          
+          // If still too large (> 2MB), reduce quality further
+          let currentQuality = quality;
+          while (compressedBase64.length > 2 * 1024 * 1024 && currentQuality > 0.1) {
+            currentQuality -= 0.1;
+            compressedBase64 = canvas.toDataURL('image/jpeg', currentQuality);
+          }
+          
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Check file size (limit to 10MB for raw input, will be compressed)
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please select an image smaller than 5MB.",
+        description: "Please select an image smaller than 10MB.",
         variant: "destructive",
       });
       return;
     }
 
-    // Convert to base64 for preview and storage
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setPhoto(base64String);
+    try {
+      toast({
+        title: "Processing image...",
+        description: "Compressing for optimal storage.",
+      });
+      
+      // Compress image to thumbnail size (max 800px width, JPEG quality 70%)
+      const compressedBase64 = await compressImage(file, 800, 0.7);
+      
+      // Calculate size reduction for user feedback
+      const originalSizeKB = Math.round(file.size / 1024);
+      const compressedSizeKB = Math.round((compressedBase64.length * 3) / 4 / 1024);
+      
+      setPhoto(compressedBase64);
       toast({
         title: "Photo captured",
-        description: "Image attached to the task.",
+        description: `Image compressed: ${originalSizeKB}KB → ${compressedSizeKB}KB`,
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        title: "Error processing image",
+        description: "Please try again with a different image.",
+        variant: "destructive",
+      });
+    }
   };
 
   const processAI = async () => {
