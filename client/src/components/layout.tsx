@@ -85,7 +85,10 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
           </Avatar>
           <div className="flex-1 overflow-hidden min-w-0">
             <p className="text-sm font-medium truncate">{authUser?.name || "Jean Dupont"}</p>
-            <p className="text-xs text-muted-foreground truncate">{authUser?.provider === "google" ? "Google" : authUser?.provider === "microsoft" ? "Microsoft" : "Email"}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {authUser?.provider === "google" ? "Google" : authUser?.provider === "microsoft" ? "Microsoft" : "Email"}
+              {authUser?.role && <span className="ml-1 text-primary font-semibold">• {authUser.role.toUpperCase()}</span>}
+            </p>
           </div>
         </div>
         <Button 

@@ -113,7 +113,7 @@ export default function Dashboard() {
         {currentUser && (
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 sm:p-6">
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary">
-              Welcome, {currentUser.group || currentUser.name}
+              Welcome, {currentUser.name}
             </h1>
             <p className="text-muted-foreground mt-1">
               {currentUser.role === "Admin" && "Viewing all tasks in the system"}
