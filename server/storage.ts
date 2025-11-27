@@ -73,6 +73,7 @@ export interface IStorage {
   getTask(id: string): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
+  deleteTask(id: string): Promise<void>;
   listTasks(filters?: {
     locationId?: string;
     status?: string;
@@ -265,6 +266,11 @@ export class PostgresStorage implements IStorage {
       .where(eq(tasksTable.id, id))
       .returning();
     return task[0];
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    await db.delete(notesTable).where(eq(notesTable.taskId, id));
+    await db.delete(tasksTable).where(eq(tasksTable.id, id));
   }
 
   async listTasks(filters?: {

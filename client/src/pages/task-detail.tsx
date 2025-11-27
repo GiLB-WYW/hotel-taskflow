@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LOCATIONS, USERS, PRIORITIES, Task, MAINTENANCE_GROUPS } from "@/lib/mockData";
-import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { AddNoteDialog } from "@/components/add-note-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -55,6 +56,7 @@ export default function TaskDetail() {
   const [isChangeLocationDialogOpen, setIsChangeLocationDialogOpen] = useState(false);
   const [isChangeGroupDialogOpen, setIsChangeGroupDialogOpen] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
   // Get current user from localStorage
@@ -125,6 +127,32 @@ export default function TaskDetail() {
       toast({
         title: "Update Failed",
         description: "Could not update task status.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation to delete task (Admin only)
+  const deleteTaskMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/tasks/${params?.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete task");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "Task Deleted",
+        description: "The task has been permanently deleted.",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete the task.",
         variant: "destructive",
       });
     },
@@ -470,6 +498,53 @@ export default function TaskDetail() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Notes Section - moved from sidebar */}
+            {notes.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {notes.map((note) => {
+                      const noteAuthor = USERS.find(u => u.id === note.createdBy);
+                      return (
+                        <div key={note.id} className="border-l-2 border-primary/30 pl-4 py-2" data-testid={`note-${note.id}`}>
+                          <div className="flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                              {noteAuthor?.avatar || "?"}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-sm font-semibold">{noteAuthor?.name || "Unknown"}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(note.createdAt), "PPp")}
+                                </span>
+                              </div>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
+                              {note.recipients.length > 0 && (
+                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span>Notified:</span>
+                                  {note.recipients.map(recipientId => {
+                                    const recipient = USERS.find(u => u.id === recipientId);
+                                    return recipient ? (
+                                      <Badge key={recipientId} variant="outline" className="text-xs">
+                                        {recipient.name}
+                                      </Badge>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -574,54 +649,17 @@ export default function TaskDetail() {
                  <CheckCircle2 className="h-4 w-4 mr-2" /> 
                  {markResolvedMutation.isPending ? "Updating..." : task.status === "Resolved" ? "Already Resolved" : "Mark Resolved"}
                </Button>
+               {currentUser.role === "Admin" && (
+                 <Button 
+                   variant="outline" 
+                   className="w-full border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-red-600"
+                   onClick={() => setIsDeleteDialogOpen(true)}
+                   data-testid="button-delete-task"
+                 >
+                   <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+                 </Button>
+               )}
             </div>
-
-            {/* Notes Section */}
-            {notes.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Activity Log</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {notes.map((note) => {
-                      const noteAuthor = USERS.find(u => u.id === note.createdBy);
-                      return (
-                        <div key={note.id} className="border-l-2 border-muted pl-4 py-2" data-testid={`note-${note.id}`}>
-                          <div className="flex items-start gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                              {noteAuthor?.avatar || "?"}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-baseline gap-2 mb-1">
-                                <span className="text-sm font-semibold">{noteAuthor?.name || "Unknown"}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(note.createdAt), "PPp")}
-                                </span>
-                              </div>
-                              <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
-                              {note.recipients.length > 0 && (
-                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span>Notified:</span>
-                                  {note.recipients.map(recipientId => {
-                                    const recipient = USERS.find(u => u.id === recipientId);
-                                    return recipient ? (
-                                      <Badge key={recipientId} variant="outline" className="text-xs">
-                                        {recipient.name}
-                                      </Badge>
-                                    ) : null;
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </div>
@@ -727,6 +765,29 @@ export default function TaskDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Task Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+              All notes and attachments will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteTaskMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-task"
+            >
+              {deleteTaskMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

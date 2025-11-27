@@ -548,6 +548,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/tasks/:id", async (req, res) => {
+    try {
+      await storage.deleteTask(req.params.id);
+      res.json({ success: true, message: "Task deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
   // Notes routes
   app.post("/api/tasks/:taskId/notes", async (req, res) => {
     try {
