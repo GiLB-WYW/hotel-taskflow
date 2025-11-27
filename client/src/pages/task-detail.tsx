@@ -557,57 +557,37 @@ export default function TaskDetail() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm font-medium mb-2">Assigned Group</p>
-                  {canEditAssignments ? (
-                    <Button
-                      variant="secondary"
-                      className="text-sm w-full justify-center py-1"
-                      onClick={() => setIsChangeGroupDialogOpen(true)}
-                      data-testid="button-change-group"
-                    >
-                      {assignedGroupName}
-                    </Button>
-                  ) : (
-                    <Badge variant="secondary" className="text-sm w-full justify-center py-1">
-                      {assignedGroupName}
-                    </Badge>
-                  )}
+                  <Button
+                    variant="secondary"
+                    className="text-sm w-full justify-center py-2 cursor-pointer hover:bg-secondary/80"
+                    onClick={() => setIsChangeGroupDialogOpen(true)}
+                    data-testid="button-change-group"
+                  >
+                    {assignedGroupName}
+                  </Button>
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-2">Assigned To</p>
                   {assignee ? (
-                    canEditAssignments ? (
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start p-2"
-                        onClick={() => setIsAssignUserDialogOpen(true)}
-                        data-testid="button-change-assignee"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                            {'avatar' in assignee && assignee.avatar ? assignee.avatar : assignee.name?.[0] || '?'}
-                          </div>
-                          <span className="text-sm font-medium">{assignee.name}</span>
-                        </div>
-                      </Button>
-                    ) : (
-                      <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start p-2 hover:bg-muted cursor-pointer"
+                      onClick={() => setIsAssignUserDialogOpen(true)}
+                      data-testid="button-change-assignee"
+                    >
+                      <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                           {'avatar' in assignee && assignee.avatar ? assignee.avatar : assignee.name?.[0] || '?'}
                         </div>
                         <span className="text-sm font-medium">{assignee.name}</span>
                       </div>
-                    )
+                    </Button>
                   ) : (
                      <Button 
                        variant="outline" 
-                       className="w-full border-dashed text-muted-foreground"
-                       onClick={() => canEditAssignments ? setIsAssignUserDialogOpen(true) : toast({
-                         title: "Permission Denied",
-                         description: "Only admins and managers can assign tasks.",
-                         variant: "destructive",
-                       })}
+                       className="w-full border-dashed text-muted-foreground cursor-pointer"
+                       onClick={() => setIsAssignUserDialogOpen(true)}
                        data-testid="button-assign-person"
-                       disabled={!canEditAssignments}
                      >
                        <User className="h-4 w-4 mr-2" />
                        Assign Person
@@ -651,16 +631,14 @@ export default function TaskDetail() {
                  <CheckCircle2 className="h-4 w-4 mr-2" /> 
                  {markResolvedMutation.isPending ? "Updating..." : task.status === "Resolved" ? "Already Resolved" : "Mark Resolved"}
                </Button>
-               {isAdmin && (
-                 <Button 
-                   variant="outline" 
-                   className="w-full border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-red-600"
-                   onClick={() => setIsDeleteDialogOpen(true)}
-                   data-testid="button-delete-task"
-                 >
-                   <Trash2 className="h-4 w-4 mr-2" /> Delete Task
-                 </Button>
-               )}
+               <Button 
+                 variant="destructive" 
+                 className="w-full"
+                 onClick={() => setIsDeleteDialogOpen(true)}
+                 data-testid="button-delete-task"
+               >
+                 <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+               </Button>
             </div>
           </div>
         </div>
