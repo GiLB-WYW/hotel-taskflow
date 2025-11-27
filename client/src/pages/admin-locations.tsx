@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, ArrowLeft, Upload } from "lucide-react";
+import { Plus, Edit, ArrowLeft, Upload, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Location {
@@ -25,6 +26,7 @@ export default function AdminLocations() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
   const [formData, setFormData] = useState({ name: "", code: "", category: "" });
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +79,30 @@ export default function AdminLocations() {
       toast({ title: "Error", description: "Failed to update location.", variant: "destructive" });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/locations/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete location");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({ title: "Location Deleted", description: "Location has been removed." });
+      setDeletingLocation(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete location.", variant: "destructive" });
+    },
+  });
+
+  const handleDelete = () => {
+    if (deletingLocation) {
+      deleteMutation.mutate(deletingLocation.id);
+    }
+  };
 
   const handleAdd = () => {
     if (!formData.name || !formData.code || !formData.category) {
@@ -250,14 +276,25 @@ export default function AdminLocations() {
                         <td className="py-3 px-4">{location.category}</td>
                         <td className="py-3 px-4 font-mono text-sm">{location.code}</td>
                         <td className="py-3 px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(location)}
-                            data-testid={`button-edit-location-${location.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(location)}
+                              data-testid={`button-edit-location-${location.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingLocation(location)}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-location-${location.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -374,6 +411,28 @@ export default function AdminLocations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingLocation} onOpenChange={(open) => !open && setDeletingLocation(null)}>
+        <AlertDialogContent data-testid="dialog-delete-location">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Location</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingLocation?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

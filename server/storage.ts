@@ -44,6 +44,7 @@ export interface IStorage {
   getLocationByCode(code: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
   updateLocation(id: string, updates: Partial<InsertLocation>): Promise<Location>;
+  deleteLocation(id: string): Promise<void>;
   listLocations(): Promise<Location[]>;
 
   // Maintenance Groups
@@ -154,6 +155,10 @@ export class PostgresStorage implements IStorage {
       .where(eq(locationsTable.id, id))
       .returning();
     return location[0];
+  }
+
+  async deleteLocation(id: string): Promise<void> {
+    await db.delete(locationsTable).where(eq(locationsTable.id, id));
   }
 
   async listLocations(): Promise<Location[]> {

@@ -242,6 +242,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/locations/:id", async (req, res) => {
+    try {
+      await storage.deleteLocation(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete location" });
+    }
+  });
+
   // Task routes
   app.get("/api/tasks", async (req, res) => {
     try {
