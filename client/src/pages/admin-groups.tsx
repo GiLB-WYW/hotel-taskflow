@@ -15,6 +15,7 @@ import { Plus, Edit, Users, ArrowLeft, Trash2 } from "lucide-react";
 interface MaintenanceGroup {
   id: string;
   name: string;
+  description: string | null;
   memberCount: number;
 }
 
@@ -32,7 +33,7 @@ export default function AdminGroups() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<MaintenanceGroup | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<MaintenanceGroup | null>(null);
-  const [formData, setFormData] = useState({ name: "", members: 0 });
+  const [formData, setFormData] = useState({ name: "", description: "", members: 0 });
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -46,7 +47,7 @@ export default function AdminGroups() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; members: number }) => {
+    mutationFn: async (data: { name: string; description: string; members: number }) => {
       const response = await fetch("/api/maintenance-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,7 +60,7 @@ export default function AdminGroups() {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
       toast({ title: "Group Created", description: "New maintenance group has been added." });
       setIsAddDialogOpen(false);
-      setFormData({ name: "", members: 0 });
+      setFormData({ name: "", description: "", members: 0 });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create group.", variant: "destructive" });
@@ -81,7 +82,7 @@ export default function AdminGroups() {
       toast({ title: "Group Updated", description: "Maintenance group has been updated." });
       setIsEditDialogOpen(false);
       setEditingGroup(null);
-      setFormData({ name: "", members: 0 });
+      setFormData({ name: "", description: "", members: 0 });
       setSelectedUserIds([]);
     },
     onError: () => {
@@ -145,8 +146,8 @@ export default function AdminGroups() {
     }
 
     try {
-      // Update group name
-      await updateMutation.mutateAsync({ id: editingGroup.id, data: { name: formData.name } });
+      // Update group name and description
+      await updateMutation.mutateAsync({ id: editingGroup.id, data: { name: formData.name, description: formData.description || null } });
 
       // Get users that were in this group before
       const previousGroupMembers = users.filter(u => u.group === editingGroup.id);
@@ -172,7 +173,7 @@ export default function AdminGroups() {
       toast({ title: "Success", description: "Group and members updated successfully." });
       setIsEditDialogOpen(false);
       setEditingGroup(null);
-      setFormData({ name: "", members: 0 });
+      setFormData({ name: "", description: "", members: 0 });
       setSelectedUserIds([]);
     } catch (error) {
       toast({ title: "Error", description: "Failed to update group.", variant: "destructive" });
@@ -181,7 +182,7 @@ export default function AdminGroups() {
 
   const openEditDialog = (group: MaintenanceGroup) => {
     setEditingGroup(group);
-    setFormData({ name: group.name, members: group.memberCount });
+    setFormData({ name: group.name, description: group.description || "", members: group.memberCount });
     
     // Pre-select users that belong to this group
     const groupMembers = users.filter(u => u.group === group.id).map(u => u.id);
@@ -236,8 +237,8 @@ export default function AdminGroups() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-semibold">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold">Description</th>
                       <th className="text-left py-3 px-4 font-semibold">Members</th>
-                      <th className="text-left py-3 px-4 font-semibold">ID</th>
                       <th className="text-right py-3 px-4 font-semibold">Actions</th>
                     </tr>
                   </thead>
@@ -247,8 +248,8 @@ export default function AdminGroups() {
                       return (
                       <tr key={group.id} className="border-b hover:bg-muted/50" data-testid={`row-group-${group.id}`}>
                         <td className="py-3 px-4 font-medium">{group.name}</td>
+                        <td className="py-3 px-4 text-muted-foreground">{group.description || "-"}</td>
                         <td className="py-3 px-4">{groupMemberCount}</td>
-                        <td className="py-3 px-4 font-mono text-sm text-muted-foreground">{group.id}</td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1">
                             <Button
@@ -300,6 +301,16 @@ export default function AdminGroups() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="add-description">Description</Label>
+              <Input
+                id="add-description"
+                data-testid="input-add-group-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="e.g., Plumbing & Water Systems"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="add-members">Number of Members</Label>
               <Input
                 id="add-members"
@@ -336,6 +347,16 @@ export default function AdminGroups() {
                 data-testid="input-edit-group-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                data-testid="input-edit-group-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="e.g., Plumbing & Water Systems"
               />
             </div>
             <div className="space-y-2">
