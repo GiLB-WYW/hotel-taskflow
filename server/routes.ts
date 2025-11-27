@@ -185,6 +185,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk upload locations from CSV data
+  app.post("/api/locations/upload", async (req, res) => {
+    try {
+      const { locations: locationData } = req.body;
+      
+      if (!Array.isArray(locationData) || locationData.length === 0) {
+        return res.status(400).json({ error: "No location data provided" });
+      }
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [] as string[],
+      };
+
+      for (const item of locationData) {
+        try {
+          // Generate code from building + name (e.g., "A-PRIVE1")
+          const code = `${item.building}-${item.name.toUpperCase().replace(/\s+/g, '')}`.substring(0, 20);
+          
+          const locationToCreate = {
+            name: item.name,
+            code: code,
+            category: `Building ${item.building}`,
+          };
+
+          await storage.createLocation(locationToCreate);
+          results.success++;
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push(`Failed to create "${item.name}": ${error.message || 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        message: `Upload complete: ${results.success} locations created, ${results.failed} failed`,
+        ...results,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process upload" });
+    }
+  });
+
   app.patch("/api/locations/:id", async (req, res) => {
     try {
       const partialSchema = insertLocationSchema.partial();

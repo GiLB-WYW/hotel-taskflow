@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, ArrowLeft } from "lucide-react";
+import { Plus, Edit, ArrowLeft, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Location {
@@ -26,6 +26,8 @@ export default function AdminLocations() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [formData, setFormData] = useState({ name: "", code: "", category: "" });
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -103,6 +105,87 @@ export default function AdminLocations() {
     setIsAddDialogOpen(true);
   };
 
+  const parseCSV = (csvText: string): { building: string; name: string }[] => {
+    const lines = csvText.trim().split('\n');
+    const results: { building: string; name: string }[] = [];
+    
+    // Skip header row if it looks like a header
+    const startIndex = lines[0]?.toLowerCase().includes('batiment') || lines[0]?.toLowerCase().includes('building') ? 1 : 0;
+    
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Handle both comma and semicolon delimiters
+      const parts = line.includes(';') ? line.split(';') : line.split(',');
+      
+      if (parts.length >= 2) {
+        results.push({
+          building: parts[0].trim(),
+          name: parts[1].trim(),
+        });
+      }
+    }
+    
+    return results;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    try {
+      const text = await file.text();
+      const locations = parseCSV(text);
+      
+      if (locations.length === 0) {
+        toast({ 
+          title: "No Data Found", 
+          description: "Could not parse any locations from the CSV file.", 
+          variant: "destructive" 
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      const response = await fetch("/api/locations/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Upload failed");
+      }
+
+      toast({ 
+        title: "Upload Complete", 
+        description: result.message 
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      
+      if (result.errors?.length > 0) {
+        console.log("Upload errors:", result.errors);
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Upload Failed", 
+        description: error.message || "Could not upload locations.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -116,9 +199,28 @@ export default function AdminLocations() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-3xl font-bold flex-1">Manage Locations</h1>
-          <Button onClick={openAddDialog} data-testid="button-add-location">
-            <Plus className="h-4 w-4 mr-2" /> Add Location
-          </Button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+              data-testid="input-csv-upload"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              data-testid="button-upload-csv"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {isUploading ? "Uploading..." : "Upload CSV"}
+            </Button>
+            <Button onClick={openAddDialog} data-testid="button-add-location">
+              <Plus className="h-4 w-4 mr-2" /> Add Location
+            </Button>
+          </div>
         </div>
 
         <Card>
