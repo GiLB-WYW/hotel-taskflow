@@ -626,6 +626,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/maintenance-groups/:id", async (req, res) => {
+    try {
+      await storage.deleteMaintenanceGroup(req.params.id);
+      res.json({ message: "Maintenance group deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete maintenance group" });
+    }
+  });
+
   // Password Reset
   app.post("/api/auth/reset-password", async (req, res) => {
     try {

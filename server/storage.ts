@@ -66,6 +66,7 @@ export interface IStorage {
   getMaintenanceGroup(id: string): Promise<MaintenanceGroup | undefined>;
   createMaintenanceGroup(group: InsertMaintenanceGroup): Promise<MaintenanceGroup>;
   updateMaintenanceGroup(id: string, updates: Partial<InsertMaintenanceGroup>): Promise<MaintenanceGroup>;
+  deleteMaintenanceGroup(id: string): Promise<void>;
   listMaintenanceGroups(): Promise<MaintenanceGroup[]>;
 
   // Tasks
@@ -237,6 +238,10 @@ export class PostgresStorage implements IStorage {
       .where(eq(maintenanceGroupsTable.id, id))
       .returning();
     return group[0];
+  }
+
+  async deleteMaintenanceGroup(id: string): Promise<void> {
+    await db.delete(maintenanceGroupsTable).where(eq(maintenanceGroupsTable.id, id));
   }
 
   async listMaintenanceGroups(): Promise<MaintenanceGroup[]> {

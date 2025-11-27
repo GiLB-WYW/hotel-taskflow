@@ -4,12 +4,13 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Users, ArrowLeft } from "lucide-react";
+import { Plus, Edit, Users, ArrowLeft, Trash2 } from "lucide-react";
 
 interface MaintenanceGroup {
   id: string;
@@ -30,6 +31,7 @@ export default function AdminGroups() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<MaintenanceGroup | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<MaintenanceGroup | null>(null);
   const [formData, setFormData] = useState({ name: "", members: 0 });
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const { toast } = useToast();
@@ -98,6 +100,35 @@ export default function AdminGroups() {
       return response.json();
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/maintenance-groups/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete group");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Group Deleted", description: "Maintenance group has been removed." });
+      setGroupToDelete(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete group.", variant: "destructive" });
+    },
+  });
+
+  const handleDelete = (group: MaintenanceGroup) => {
+    setGroupToDelete(group);
+  };
+
+  const confirmDelete = () => {
+    if (groupToDelete) {
+      deleteMutation.mutate(groupToDelete.id);
+    }
+  };
 
   const handleAdd = () => {
     if (!formData.name || formData.members < 0) {
@@ -219,14 +250,27 @@ export default function AdminGroups() {
                         <td className="py-3 px-4">{groupMemberCount}</td>
                         <td className="py-3 px-4 font-mono text-sm text-muted-foreground">{group.id}</td>
                         <td className="py-3 px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(group)}
-                            data-testid={`button-edit-group-${group.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(group)}
+                              title="Edit group"
+                              data-testid={`button-edit-group-${group.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(group)}
+                              title="Delete group"
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-group-${group.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     )})}
@@ -343,6 +387,29 @@ export default function AdminGroups() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!groupToDelete} onOpenChange={(open) => !open && setGroupToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Maintenance Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{groupToDelete?.name}"? 
+              This action cannot be undone. Users assigned to this group will be unassigned.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-group"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
