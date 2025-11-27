@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { usersTable, locationsTable, maintenanceGroupsTable, tasksTable } from "@shared/schema";
+import { usersTable, locationsTable, maintenanceGroupsTable, tasksTable, categoriesTable } from "@shared/schema";
 
 async function seed() {
   try {
@@ -9,6 +9,7 @@ async function seed() {
     await db.delete(tasksTable);
     await db.delete(maintenanceGroupsTable);
     await db.delete(locationsTable);
+    await db.delete(categoriesTable);
     await db.delete(usersTable);
 
     // Seed users with hashed passwords
@@ -78,6 +79,24 @@ async function seed() {
     console.log("  - gilles@toileblanche.com (password: Welcome123!)");
     console.log("  - nicolas@toileblanche.com (password: Welcome123!)");
     console.log("  - gregory@toileblanche.com (password: Welcome123!)");
+
+    // Seed categories
+    await db
+      .insert(categoriesTable)
+      .values([
+        { name: "Restaurant", description: "Restaurant and dining areas" },
+        { name: "Suites B", description: "Suites in Building B" },
+        { name: "Suites C", description: "Suites in Building C" },
+        { name: "Technical", description: "Technical and maintenance areas" },
+        { name: "Pool Machinery", description: "Pool equipment and machinery" },
+        { name: "Building A", description: "Building A rooms and areas" },
+        { name: "Building D", description: "Building D rooms and areas" },
+        { name: "Building E", description: "Building E rooms and areas" },
+        { name: "Building F", description: "Building F rooms and areas" },
+        { name: "Building G", description: "Building G rooms and areas" },
+      ])
+      .returning();
+    console.log("✅ Categories seeded");
 
     // Seed locations
     const locations = await db
