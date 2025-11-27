@@ -17,11 +17,19 @@ export const usersTable = pgTable("users", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// Categories table
+export const categoriesTable = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // Locations table
 export const locationsTable = pgTable("locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  category: text("category").notNull(), // Restaurant, Suites B, Suites C, Technical, Pool Machinery
+  category: text("category").notNull(), // Reference to category name
   code: varchar("code").unique(), // For quick search (e.g., "C2", "R1")
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -69,6 +77,11 @@ export const insertUserSchema = createInsertSchema(usersTable).omit({
   createdAt: true,
 });
 
+export const insertCategorySchema = createInsertSchema(categoriesTable).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertLocationSchema = createInsertSchema(locationsTable).omit({
   id: true,
   createdAt: true,
@@ -92,6 +105,7 @@ export const insertNoteSchema = createInsertSchema(notesTable).omit({
 
 // Select types
 export type User = typeof usersTable.$inferSelect;
+export type Category = typeof categoriesTable.$inferSelect;
 export type Location = typeof locationsTable.$inferSelect;
 export type MaintenanceGroup = typeof maintenanceGroupsTable.$inferSelect;
 export type Task = typeof tasksTable.$inferSelect;
@@ -99,6 +113,7 @@ export type Note = typeof notesTable.$inferSelect;
 
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
 export type InsertMaintenanceGroup = z.infer<typeof insertMaintenanceGroupSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;

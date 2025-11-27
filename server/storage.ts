@@ -2,6 +2,8 @@ import { db } from "./db";
 import {
   type User,
   type InsertUser,
+  type Category,
+  type InsertCategory,
   type Location,
   type InsertLocation,
   type MaintenanceGroup,
@@ -11,11 +13,13 @@ import {
   type Note,
   type InsertNote,
   usersTable,
+  categoriesTable,
   locationsTable,
   maintenanceGroupsTable,
   tasksTable,
   notesTable,
   insertUserSchema,
+  insertCategorySchema,
   insertLocationSchema,
   insertMaintenanceGroupSchema,
   insertTaskSchema,
@@ -38,6 +42,13 @@ export interface IStorage {
   updatePassword(userId: string, newPassword: string): Promise<void>;
   verifyPassword(userId: string, password: string): Promise<boolean>;
   listUsers(): Promise<User[]>;
+
+  // Categories
+  getCategory(id: string): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category>;
+  deleteCategory(id: string): Promise<void>;
+  listCategories(): Promise<Category[]>;
 
   // Locations
   getLocation(id: string): Promise<Location | undefined>;
@@ -129,6 +140,36 @@ export class PostgresStorage implements IStorage {
 
   async listUsers(): Promise<User[]> {
     return await db.select().from(usersTable);
+  }
+
+  // Categories
+  async getCategory(id: string): Promise<Category | undefined> {
+    const category = await db.select().from(categoriesTable).where(eq(categoriesTable.id, id));
+    return category[0];
+  }
+
+  async createCategory(data: InsertCategory): Promise<Category> {
+    const validated = insertCategorySchema.parse(data);
+    const category = await db.insert(categoriesTable).values(validated).returning();
+    return category[0];
+  }
+
+  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category> {
+    const partialSchema = insertCategorySchema.partial();
+    const validated = partialSchema.parse(updates);
+    const category = await db.update(categoriesTable)
+      .set(validated)
+      .where(eq(categoriesTable.id, id))
+      .returning();
+    return category[0];
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await db.delete(categoriesTable).where(eq(categoriesTable.id, id));
+  }
+
+  async listCategories(): Promise<Category[]> {
+    return await db.select().from(categoriesTable);
   }
 
   async getLocation(id: string): Promise<Location | undefined> {
