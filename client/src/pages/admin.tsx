@@ -499,12 +499,14 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="locations" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full md:w-[800px] grid-cols-4">
-            <TabsTrigger value="locations">Locations</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="users">Users & Roles</TabsTrigger>
-            <TabsTrigger value="groups">Maintenance Groups</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-2">
+            <TabsList className="inline-flex w-auto min-w-full md:w-[800px] md:grid md:grid-cols-4">
+              <TabsTrigger value="locations" className="flex-shrink-0 px-4">Locations</TabsTrigger>
+              <TabsTrigger value="categories" className="flex-shrink-0 px-4">Categories</TabsTrigger>
+              <TabsTrigger value="users" className="flex-shrink-0 px-4">Users & Roles</TabsTrigger>
+              <TabsTrigger value="groups" className="flex-shrink-0 px-4 whitespace-nowrap">Maintenance Groups</TabsTrigger>
+            </TabsList>
+          </div>
 
           <div className="mt-4 flex items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border">
             <div className="relative flex-1 max-w-sm">
@@ -697,13 +699,14 @@ export default function Admin() {
                 {locationsLoading ? (
                   <p className="text-center text-muted-foreground py-8">Loading...</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>ID</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="min-w-[120px]">Name</TableHead>
+                        <TableHead className="min-w-[100px]">Category</TableHead>
+                        <TableHead className="min-w-[200px]">ID</TableHead>
+                        <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -734,6 +737,7 @@ export default function Admin() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -753,13 +757,14 @@ export default function Admin() {
                 ) : filteredCategories.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No categories found. Create your first category to get started.</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Category Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Locations</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="min-w-[140px]">Category Name</TableHead>
+                        <TableHead className="min-w-[150px]">Description</TableHead>
+                        <TableHead className="min-w-[100px]">Locations</TableHead>
+                        <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -808,6 +813,7 @@ export default function Admin() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -967,14 +973,15 @@ export default function Admin() {
                 {usersLoading ? (
                   <p className="text-center text-muted-foreground py-8">Loading...</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Group</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="min-w-[120px]">Name</TableHead>
+                        <TableHead className="min-w-[150px]">Email</TableHead>
+                        <TableHead className="min-w-[80px]">Role</TableHead>
+                        <TableHead className="min-w-[100px]">Group</TableHead>
+                        <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1017,6 +1024,7 @@ export default function Admin() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1045,12 +1053,13 @@ export default function Admin() {
                 {groupsLoading ? (
                   <p className="text-center text-muted-foreground py-8">Loading...</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Group Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Members</TableHead>
+                        <TableHead className="min-w-[120px]">Group Name</TableHead>
+                        <TableHead className="min-w-[150px]">Description</TableHead>
+                        <TableHead className="min-w-[80px]">Members</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1072,6 +1081,7 @@ export default function Admin() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
