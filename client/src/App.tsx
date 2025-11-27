@@ -15,6 +15,7 @@ import AdminGroups from "@/pages/admin-groups";
 import TaskDetail from "@/pages/task-detail";
 import LocationDetail from "@/pages/location-detail";
 import ResetPassword from "@/pages/reset-password";
+import AcceptInvite from "@/pages/accept-invite";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
@@ -22,6 +23,7 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/accept-invite" component={AcceptInvite} />
         <Route component={Login} />
       </Switch>
     );
