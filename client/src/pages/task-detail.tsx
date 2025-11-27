@@ -158,8 +158,10 @@ export default function TaskDetail() {
     },
   });
 
-  // Check if user can edit assignments (Admin or Manager)
-  const canEditAssignments = currentUser.role === "Admin" || currentUser.role === "Manager";
+  // Check if user can edit assignments (Admin or Manager) - case insensitive
+  const userRole = currentUser.role?.toLowerCase() || "";
+  const canEditAssignments = userRole === "admin" || userRole === "manager";
+  const isAdmin = userRole === "admin";
 
   // Filter users based on search query
   const filteredUsers = users.filter(user =>
@@ -649,7 +651,7 @@ export default function TaskDetail() {
                  <CheckCircle2 className="h-4 w-4 mr-2" /> 
                  {markResolvedMutation.isPending ? "Updating..." : task.status === "Resolved" ? "Already Resolved" : "Mark Resolved"}
                </Button>
-               {currentUser.role === "Admin" && (
+               {isAdmin && (
                  <Button 
                    variant="outline" 
                    className="w-full border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-red-600"
