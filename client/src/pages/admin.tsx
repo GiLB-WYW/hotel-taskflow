@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree } from "lucide-react";
+import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Location, User, MaintenanceGroup } from "@/lib/mockData";
@@ -30,6 +30,7 @@ export default function Admin() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isEditCategoryDialogOpen, setIsEditCategoryDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
@@ -42,6 +43,7 @@ export default function Admin() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editUserForm, setEditUserForm] = useState({ name: "", email: "", role: "", password: "" });
   const [editCategoryForm, setEditCategoryForm] = useState({ name: "", description: "" });
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "Basic Staff" });
 
   // Fetch data from API
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -289,6 +291,57 @@ export default function Admin() {
     },
   });
 
+  // Get current user from localStorage for invite
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const sendInviteMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; role: string }) => {
+      const response = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          invitedBy: currentUser.id,
+        }),
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to send invitation");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setIsInviteDialogOpen(false);
+      setInviteForm({ name: "", email: "", role: "Basic Staff" });
+      toast({
+        title: "Invitation Sent",
+        description: data.emailSent 
+          ? `An invitation email has been sent to ${data.email}` 
+          : `Invitation created, but email could not be sent. Share the invite link manually.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendInvite = () => {
+    if (!inviteForm.name || !inviteForm.email) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both name and email",
+        variant: "destructive",
+      });
+      return;
+    }
+    sendInviteMutation.mutate(inviteForm);
+  };
+
   const filteredLocations = locations.filter(l => 
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     l.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -523,78 +576,146 @@ export default function Admin() {
             )}
 
             {activeTab === 'users' && (
-              <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-primary text-primary-foreground" data-testid="button-add-user">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add User
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add New User</DialogTitle>
-                    <DialogDescription>
-                      Create a new user account with role and permissions.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="user-name">Full Name</Label>
-                      <Input
-                        id="user-name"
-                        placeholder="e.g., Jean Dupont"
-                        value={newUser.name}
-                        onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                        data-testid="input-user-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-email">Email</Label>
-                      <Input
-                        id="user-email"
-                        type="email"
-                        placeholder="jean@hotel.com"
-                        value={newUser.email}
-                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                        data-testid="input-user-email"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-password">Password</Label>
-                      <Input
-                        id="user-password"
-                        type="password"
-                        placeholder="Temporary password"
-                        value={newUser.password}
-                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                        data-testid="input-user-password"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-role">Role</Label>
-                      <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}>
-                        <SelectTrigger id="user-role" data-testid="select-user-role">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Admin">Admin</SelectItem>
-                          <SelectItem value="Manager">Manager</SelectItem>
-                          <SelectItem value="Personnel">Personnel</SelectItem>
-                          <SelectItem value="Basic Staff">Basic Staff</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                      Cancel
+              <div className="flex gap-2">
+                <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary text-primary-foreground" data-testid="button-invite-user">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Invite User
                     </Button>
-                    <Button onClick={handleCreateUser} data-testid="button-submit-user">
-                      Create User
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite New User</DialogTitle>
+                      <DialogDescription>
+                        Send an email invitation for a new user to join and set their own password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-name">Full Name</Label>
+                        <Input
+                          id="invite-name"
+                          placeholder="e.g., Jean Dupont"
+                          value={inviteForm.name}
+                          onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+                          data-testid="input-invite-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-email">Email</Label>
+                        <Input
+                          id="invite-email"
+                          type="email"
+                          placeholder="jean@hotel.com"
+                          value={inviteForm.email}
+                          onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                          data-testid="input-invite-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-role">Role</Label>
+                        <Select value={inviteForm.role} onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}>
+                          <SelectTrigger id="invite-role" data-testid="select-invite-role">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Admin">Admin</SelectItem>
+                            <SelectItem value="Manager">Manager</SelectItem>
+                            <SelectItem value="Personnel">Personnel</SelectItem>
+                            <SelectItem value="Basic Staff">Basic Staff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSendInvite} 
+                        disabled={sendInviteMutation.isPending}
+                        data-testid="button-send-invite"
+                      >
+                        {sendInviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" data-testid="button-add-user">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add User Directly
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New User</DialogTitle>
+                      <DialogDescription>
+                        Create a new user account with a temporary password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="user-name">Full Name</Label>
+                        <Input
+                          id="user-name"
+                          placeholder="e.g., Jean Dupont"
+                          value={newUser.name}
+                          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                          data-testid="input-user-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-email">Email</Label>
+                        <Input
+                          id="user-email"
+                          type="email"
+                          placeholder="jean@hotel.com"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                          data-testid="input-user-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-password">Password</Label>
+                        <Input
+                          id="user-password"
+                          type="password"
+                          placeholder="Temporary password"
+                          value={newUser.password}
+                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                          data-testid="input-user-password"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-role">Role</Label>
+                        <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}>
+                          <SelectTrigger id="user-role" data-testid="select-user-role">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Admin">Admin</SelectItem>
+                            <SelectItem value="Manager">Manager</SelectItem>
+                            <SelectItem value="Personnel">Personnel</SelectItem>
+                            <SelectItem value="Basic Staff">Basic Staff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleCreateUser} data-testid="button-submit-user">
+                        Create User
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
             )}
 
             {activeTab === 'categories' && (
