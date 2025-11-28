@@ -48,23 +48,35 @@ export default function Login() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
+        credentials: "same-origin",
       });
 
       console.log("Response status:", response.status);
-      const data = await response.json();
-      console.log("Response data:", data);
-
+      
       if (!response.ok) {
+        let errorMessage = "Invalid credentials";
+        try {
+          const data = await response.json();
+          errorMessage = data.error || errorMessage;
+          console.log("Error response data:", data);
+        } catch (parseError) {
+          console.error("Failed to parse error response:", parseError);
+        }
+        
         toast({
           title: "Login Failed",
-          description: data.error || "Invalid credentials",
+          description: errorMessage,
           variant: "destructive",
         });
         setIsLoading(false);
         return;
       }
+      
+      const data = await response.json();
+      console.log("Response data:", data);
 
       // Store user data including role and group
       localStorage.setItem("user", JSON.stringify({
@@ -74,7 +86,7 @@ export default function Login() {
         role: data.role,
         group: data.group,
         provider: data.authProvider || "email",
-        avatar: data.avatar || email[0].toUpperCase(),
+        avatar: data.avatar || trimmedEmail[0].toUpperCase(),
       }));
       
       toast({
@@ -82,11 +94,13 @@ export default function Login() {
         description: `Welcome, ${data.name}!`,
       });
       
-      window.location.href = "/";
+      // Use replace to prevent going back to login page
+      window.location.replace("/");
     } catch (error) {
+      console.error("Login fetch error:", error);
       toast({
         title: "Login Failed",
-        description: "Unable to connect to the server. Please try again.",
+        description: "Unable to connect to the server. Please check your internet connection and try again.",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -177,11 +191,17 @@ export default function Login() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#A6A6A6]" />
                   <Input
                     type="email"
+                    inputMode="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10 bg-[#FAFAFA] border-[#ADB4A0] text-[#6F848E] placeholder:text-[#A6A6A6] focus:border-[#ac6b53]"
                     disabled={isLoading}
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-testid="input-email"
                   />
                 </div>
               </div>
@@ -194,11 +214,17 @@ export default function Login() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#A6A6A6]" />
                   <Input
                     type={showPassword ? "text" : "password"}
+                    inputMode="text"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10 bg-[#FAFAFA] border-[#ADB4A0] text-[#6F848E] placeholder:text-[#A6A6A6] focus:border-[#ac6b53]"
                     disabled={isLoading}
+                    autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-testid="input-password"
                   />
                   <button
                     type="button"
