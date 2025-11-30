@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { TaskCard } from "@/components/ui/task-card";
-import { LOCATIONS, Task, User } from "@/lib/mockData";
+import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { isToday } from "date-fns";
+import type { Category, Location } from "@shared/schema";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,8 +21,18 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Get unique location categories
-  const locationCategories = Array.from(new Set(LOCATIONS.map(loc => loc.category)));
+  // Fetch categories (buildings) from API
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  // Fetch locations from API
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  // Get building names for the filter dropdown
+  const locationCategories = categories.map(cat => cat.name);
 
   // Get current user from localStorage
   useEffect(() => {
@@ -68,7 +79,7 @@ export default function Dashboard() {
   // Filter Logic with Smart Search
   const filteredTasks = tasks.filter(task => {
     const searchLower = searchQuery.toLowerCase();
-    const location = LOCATIONS.find(l => l.id === task.locationId);
+    const location = locations.find(l => l.id === task.locationId);
     
     // Smart search: match title, description, location name, location code
     const matchesSearch = 
@@ -85,7 +96,7 @@ export default function Dashboard() {
     // Match by location category (e.g., "Suites B", "Restaurant", etc.)
     let matchesLocationCategory = true;
     if (locationCategoryFilter !== "All") {
-      const taskLocation = LOCATIONS.find(l => l.id === task.locationId);
+      const taskLocation = locations.find(l => l.id === task.locationId);
       matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
     }
 
