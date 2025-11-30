@@ -3,10 +3,12 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, Square, Camera, RotateCcw, Check, Loader2, Play, Pause } from "lucide-react";
-import { LOCATIONS, PRIORITIES, MAINTENANCE_GROUPS } from "@/lib/mockData";
+import { PRIORITIES } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Location, MaintenanceGroup } from "@shared/schema";
 
 // Steps in the workflow
 type Step = "capture" | "processing" | "review" | "success";
@@ -23,8 +25,18 @@ export default function CreateTask() {
   const [transcript, setTranscript] = useState("");
   const { toast } = useToast();
   const [, navigate] = useLocation();
+
+  // Fetch locations from API
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  // Fetch maintenance groups from API
+  const { data: maintenanceGroups = [] } = useQuery<MaintenanceGroup[]>({
+    queryKey: ["/api/maintenance-groups"],
+  });
   
-  // Mock Form Data (Pre-filled by AI)
+  // Form Data (Pre-filled by AI)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -529,7 +541,7 @@ export default function CreateTask() {
                         onChange={(e) => setFormData({...formData, locationId: e.target.value})}
                       >
                         <option value="">-- Select Location --</option>
-                        {LOCATIONS.map(loc => (
+                        {locations.map(loc => (
                           <option key={loc.id} value={loc.id}>{loc.name} ({loc.category})</option>
                         ))}
                       </select>
@@ -556,7 +568,7 @@ export default function CreateTask() {
                     onChange={(e) => setFormData({...formData, assignedGroup: e.target.value})}
                   >
                     <option value="">-- Select Group --</option>
-                    {MAINTENANCE_GROUPS.map(g => (
+                    {maintenanceGroups.map(g => (
                       <option key={g.id} value={g.name}>{g.name} • {g.memberCount} members</option>
                     ))}
                   </select>
