@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus, Send } from "lucide-react";
+import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus, Send, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Location, User, MaintenanceGroup, Category } from "@shared/schema";
@@ -1035,7 +1035,25 @@ export default function Admin() {
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{user.group || "-"}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => {
+                                  if ((user as any).email) {
+                                    resendInvitationMutation.mutate({ 
+                                      email: (user as any).email, 
+                                      invitedBy: currentUser?.id || '' 
+                                    });
+                                  }
+                                }}
+                                disabled={resendInvitationMutation.isPending || !(user as any).email}
+                                title="Resend invitation email"
+                                data-testid={`button-resend-user-${user.id}`}
+                              >
+                                <Send className="h-4 w-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
