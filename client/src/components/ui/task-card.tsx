@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MapPin, Clock, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { Task, PRIORITIES } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -20,23 +20,42 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
   const location = locations.find(l => l.id === task.locationId);
   const assignedUser = users.find(u => u.id === task.assignedTo);
   const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
+  
+  const isResolved = task.status === 'Resolved';
+  
+  const getBorderColor = () => {
+    if (isResolved) return 'hsl(142, 70%, 45%)';
+    switch (task.priority) {
+      case 'Red Flag': return 'hsl(0, 70%, 60%)';
+      case 'High': return 'hsl(25, 85%, 60%)';
+      case 'Normal': return 'hsl(200, 60%, 50%)';
+      default: return 'hsl(150, 50%, 45%)';
+    }
+  };
 
   return (
     <Card 
-      className="overflow-hidden border-l-4 hover:shadow-md transition-all cursor-pointer group"
-      style={{ borderLeftColor: task.priority === 'Red Flag' ? 'hsl(0, 70%, 60%)' : 
-                               task.priority === 'High' ? 'hsl(25, 85%, 60%)' : 
-                               task.priority === 'Normal' ? 'hsl(200, 60%, 50%)' : 
-                               'hsl(150, 50%, 45%)' }}
+      className={cn(
+        "overflow-hidden border-l-4 hover:shadow-md transition-all cursor-pointer group",
+        isResolved && "bg-green-50/50 dark:bg-green-950/20"
+      )}
+      style={{ borderLeftColor: getBorderColor() }}
       onClick={onClick}
     >
       <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between space-y-0">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn("font-medium", priorityConfig.color)}>
-              {task.priority}
-            </Badge>
-            {task.priority === 'Red Flag' && (
+            {isResolved ? (
+              <Badge className="font-medium bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Resolved
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn("font-medium", priorityConfig.color)}>
+                {task.priority}
+              </Badge>
+            )}
+            {task.priority === 'Red Flag' && !isResolved && (
               <span className="animate-pulse text-red-600">
                 <AlertTriangle className="h-4 w-4" />
               </span>
