@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LOCATIONS, USERS, PRIORITIES, Task, MAINTENANCE_GROUPS } from "@/lib/mockData";
+import { PRIORITIES, Task } from "@/lib/mockData";
 import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -222,11 +222,11 @@ export default function TaskDetail() {
     );
   }
 
-  const location = locations.find(l => l.id === task.locationId) || LOCATIONS.find(l => l.id === task.locationId);
-  const creator = users.find(u => u.id === task.createdBy) || USERS.find(u => u.id === task.createdBy);
-  const assignee = users.find(u => u.id === task.assignedTo) || USERS.find(u => u.id === task.assignedTo);
+  const location = locations.find(l => l.id === task.locationId);
+  const creator = users.find(u => u.id === task.createdBy);
+  const assignee = users.find(u => u.id === task.assignedTo);
   const priorityConfig = PRIORITIES[task.priority];
-  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup) || MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
+  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
   const assignedGroupName = assignedGroup?.name || task.assignedGroup || "General";
 
   const exportPDF = async () => {
@@ -510,12 +510,13 @@ export default function TaskDetail() {
                 <CardContent>
                   <div className="space-y-4">
                     {notes.map((note) => {
-                      const noteAuthor = USERS.find(u => u.id === note.createdBy);
+                      const noteAuthor = users.find(u => u.id === note.createdBy);
+                      const initials = noteAuthor?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || "?";
                       return (
                         <div key={note.id} className="border-l-2 border-primary/30 pl-4 py-2" data-testid={`note-${note.id}`}>
                           <div className="flex items-start gap-3">
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                              {noteAuthor?.avatar || "?"}
+                              {initials}
                             </div>
                             <div className="flex-1">
                               <div className="flex items-baseline gap-2 mb-1">
@@ -529,7 +530,7 @@ export default function TaskDetail() {
                                 <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                                   <span>Notified:</span>
                                   {note.recipients.map(recipientId => {
-                                    const recipient = USERS.find(u => u.id === recipientId);
+                                    const recipient = users.find(u => u.id === recipientId);
                                     return recipient ? (
                                       <Badge key={recipientId} variant="outline" className="text-xs">
                                         {recipient.name}
@@ -577,7 +578,7 @@ export default function TaskDetail() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                          {'avatar' in assignee && assignee.avatar ? assignee.avatar : assignee.name?.[0] || '?'}
+                          {assignee.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
                         </div>
                         <span className="text-sm font-medium">{assignee.name}</span>
                       </div>
@@ -650,7 +651,7 @@ export default function TaskDetail() {
         onOpenChange={setIsNoteDialogOpen}
         taskId={task.id}
         currentUserId={currentUser.id}
-        availableUsers={USERS}
+        availableUsers={users}
         onNoteAdded={() => refetchNotes()}
       />
 

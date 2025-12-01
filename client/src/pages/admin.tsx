@@ -13,8 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Location, User, MaintenanceGroup } from "@/lib/mockData";
-import type { Category } from "@shared/schema";
+import type { Location, User, MaintenanceGroup, Category } from "@shared/schema";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("locations");

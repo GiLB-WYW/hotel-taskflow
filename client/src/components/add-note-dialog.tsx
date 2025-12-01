@@ -4,15 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { User } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
+
+interface AvailableUser {
+  id: string;
+  name: string;
+  role: string;
+}
 
 interface AddNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskId: string;
   currentUserId: string;
-  availableUsers: User[];
+  availableUsers: AvailableUser[];
   onNoteAdded: () => void;
 }
 
