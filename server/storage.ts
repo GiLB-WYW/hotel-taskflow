@@ -91,6 +91,8 @@ export interface IStorage {
   createInvitation(invitation: InsertInvitation): Promise<Invitation>;
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
   getInvitationByEmail(email: string): Promise<Invitation | undefined>;
+  getInvitationByEmailIncludingExpired(email: string): Promise<Invitation | undefined>;
+  updateInvitation(id: string, updates: Partial<InsertInvitation>): Promise<Invitation>;
   markInvitationAccepted(id: string): Promise<Invitation>;
   listPendingInvitations(): Promise<Invitation[]>;
   deleteInvitation(id: string): Promise<void>;
@@ -354,6 +356,22 @@ export class PostgresStorage implements IStorage {
         gte(invitationsTable.expiresAt, new Date())
       ))
       .orderBy(desc(invitationsTable.createdAt));
+    return invitation[0];
+  }
+
+  async getInvitationByEmailIncludingExpired(email: string): Promise<Invitation | undefined> {
+    const invitation = await db.select()
+      .from(invitationsTable)
+      .where(eq(invitationsTable.email, email))
+      .orderBy(desc(invitationsTable.createdAt));
+    return invitation[0];
+  }
+
+  async updateInvitation(id: string, updates: Partial<InsertInvitation>): Promise<Invitation> {
+    const invitation = await db.update(invitationsTable)
+      .set(updates)
+      .where(eq(invitationsTable.id, id))
+      .returning();
     return invitation[0];
   }
 

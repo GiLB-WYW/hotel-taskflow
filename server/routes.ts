@@ -337,6 +337,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend invitation for a user (by user email)
+  app.post("/api/invitations/resend", async (req, res) => {
+    try {
+      const { email, invitedBy } = req.body;
+
+      if (!email || !invitedBy) {
+        return res.status(400).json({ error: "Missing required fields (email, invitedBy)" });
+      }
+
+      // Get user to find their info
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if user has already activated (has a password set)
+      if (user.password) {
+        return res.status(400).json({ error: "User has already activated their account" });
+      }
+
+      // Check for existing invitation
+      const existingInvite = await storage.getInvitationByEmailIncludingExpired(email);
+      
+      // Generate new token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Set expiry to 7 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      let invitation;
+      
+      if (existingInvite && !existingInvite.acceptedAt) {
+        // Update existing invitation with new token and expiry
+        invitation = await storage.updateInvitation(existingInvite.id, {
+          token,
+          expiresAt,
+          invitedBy,
+        });
+      } else {
+        // Create new invitation
+        invitation = await storage.createInvitation({
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          token,
+          invitedBy,
+          expiresAt,
+        });
+      }
+
+      // Get inviter info for email
+      const inviter = await storage.getUser(invitedBy);
+      const inviterName = inviter?.name || 'An administrator';
+
+      // Send invitation email
+      try {
+        await sendInvitationEmail(email, user.name, token, inviterName, user.role);
+      } catch (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        return res.status(201).json({ 
+          ...invitation, 
+          emailSent: false,
+          message: "Invitation updated but email could not be sent"
+        });
+      }
+
+      res.status(200).json({ ...invitation, emailSent: true, message: "Invitation resent successfully" });
+    } catch (error) {
+      console.error('Failed to resend invitation:', error);
+      res.status(500).json({ error: "Failed to resend invitation" });
+    }
+  });
+
   // Category routes
   app.get("/api/categories", async (req, res) => {
     try {
