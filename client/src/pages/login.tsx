@@ -315,17 +315,6 @@ export default function Login() {
                   Forgot your password?
                 </button>
               </div>
-              <div className="p-3 bg-[#F0E4CE]/30 border border-[#ADB4A0]/40 rounded-lg">
-                <p className="text-xs text-[#6F848E]">
-                  <span className="font-semibold text-[#ac6b53]">Admin Users:</span>
-                </p>
-                <ul className="text-xs text-[#6F848E] mt-2 space-y-1">
-                  <li>• gilles@toileblanche.com</li>
-                  <li>• nicolas@toileblanche.com</li>
-                  <li>• gregory@toileblanche.com</li>
-                  <li className="mt-2 text-[#A6A6A6]">Default password: <span className="font-mono text-[#6F848E]">Welcome123!</span></li>
-                </ul>
-              </div>
             </div>
           </CardContent>
         </Card>
