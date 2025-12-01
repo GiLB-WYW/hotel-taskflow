@@ -8,7 +8,6 @@ import {
   LogOut, 
   Menu, 
   X,
-  Bell,
   UserCog
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { logout, getAuthUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { NotificationDropdown, MobileNotificationBell } from "@/components/ui/notification-dropdown";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -147,10 +147,7 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
           </button>
           
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground h-10 w-10">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-background"></span>
-            </Button>
+            <MobileNotificationBell />
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-10 w-10">
@@ -170,10 +167,7 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
             {navItems.find(i => i.href === location)?.label || "Dashboard"}
           </h2>
           <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
-            <Button variant="outline" size="sm" className="gap-2 hidden lg:flex">
-              <Bell className="h-4 w-4" />
-              <span>Notifications</span>
-            </Button>
+            <NotificationDropdown />
             <Button 
               size="sm" 
               className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 lg:gap-2"
