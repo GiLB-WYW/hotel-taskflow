@@ -61,6 +61,10 @@ export default function Admin() {
     queryKey: ["/api/categories"],
   });
 
+  const { data: pendingInvitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
+    queryKey: ["/api/invitations/pending"],
+  });
+
   // Mutations for creating items
   const createLocationMutation = useMutation({
     mutationFn: async (data: { name: string; category: string }) => {
@@ -218,6 +222,7 @@ export default function Admin() {
       return data;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations/pending"] });
       toast({
         title: "Invitation Sent",
         description: data.emailSent 
@@ -461,18 +466,9 @@ export default function Admin() {
     setUserToDelete(user);
   };
 
-  const handleResendInvitation = (user: User) => {
+  const handleResendPendingInvitation = (invitation: { email: string }) => {
     const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const email = (user as any).email;
-    if (!email) {
-      toast({
-        title: "Error",
-        description: "User has no email address",
-        variant: "destructive",
-      });
-      return;
-    }
-    resendInvitationMutation.mutate({ email, invitedBy: currentUser.id });
+    resendInvitationMutation.mutate({ email: invitation.email, invitedBy: currentUser.id });
   };
 
   const confirmDeleteUser = () => {
@@ -1039,7 +1035,7 @@ export default function Admin() {
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{user.group || "-"}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
+                            <div className="flex justify-end gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1049,17 +1045,6 @@ export default function Admin() {
                                 data-testid={`button-edit-user-${user.id}`}
                               >
                                 <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-primary hover:text-primary"
-                                onClick={() => handleResendInvitation(user)}
-                                disabled={resendInvitationMutation.isPending}
-                                title="Resend invitation"
-                                data-testid={`button-resend-invite-${user.id}`}
-                              >
-                                <Send className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
@@ -1077,6 +1062,76 @@ export default function Admin() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pending Invitations Section */}
+            <Card className="mt-4">
+              <CardHeader>
+                <div>
+                  <CardTitle>Pending Invitations</CardTitle>
+                  <CardDescription>
+                    Invitations that have been sent but not yet accepted.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {invitationsLoading ? (
+                  <p className="text-center text-muted-foreground py-8">Loading...</p>
+                ) : pendingInvitations.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No pending invitations</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[120px]">Name</TableHead>
+                          <TableHead className="min-w-[150px]">Email</TableHead>
+                          <TableHead className="min-w-[80px]">Role</TableHead>
+                          <TableHead className="min-w-[100px]">Status</TableHead>
+                          <TableHead className="text-right min-w-[80px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingInvitations.map((invitation: any) => (
+                          <TableRow key={invitation.id}>
+                            <TableCell className="font-medium flex items-center gap-2">
+                              <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-xs font-bold text-orange-600">
+                                {invitation.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <span data-testid={`text-invite-${invitation.id}`}>{invitation.name}</span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{invitation.email}</TableCell>
+                            <TableCell>{invitation.role}</TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                new Date(invitation.expiresAt) < new Date() 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {new Date(invitation.expiresAt) < new Date() ? 'Expired' : 'Pending'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => handleResendPendingInvitation(invitation)}
+                                disabled={resendInvitationMutation.isPending}
+                                title="Resend invitation email"
+                                data-testid={`button-resend-pending-${invitation.id}`}
+                              >
+                                <Send className="h-4 w-4" />
+                                Resend
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>

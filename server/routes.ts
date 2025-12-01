@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Resend invitation for a user (by user email)
+  // Resend invitation for a pending invitation (by email)
   app.post("/api/invitations/resend", async (req, res) => {
     try {
       const { email, invitedBy } = req.body;
@@ -346,20 +346,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing required fields (email, invitedBy)" });
       }
 
-      // Get user to find their info
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      // Check if user has already activated (has a password set)
-      if (user.password) {
+      // First check if user already exists and has a password (already activated)
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser && existingUser.password) {
         return res.status(400).json({ error: "User has already activated their account" });
       }
 
-      // Check for existing invitation
+      // Check for existing invitation (pending or expired, but not accepted)
       const existingInvite = await storage.getInvitationByEmailIncludingExpired(email);
       
+      if (!existingInvite) {
+        return res.status(404).json({ error: "No invitation found for this email" });
+      }
+
+      if (existingInvite.acceptedAt) {
+        return res.status(400).json({ error: "This invitation has already been accepted" });
+      }
+
       // Generate new token
       const token = crypto.randomBytes(32).toString('hex');
       
@@ -367,34 +370,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      let invitation;
-      
-      if (existingInvite && !existingInvite.acceptedAt) {
-        // Update existing invitation with new token and expiry
-        invitation = await storage.updateInvitation(existingInvite.id, {
-          token,
-          expiresAt,
-          invitedBy,
-        });
-      } else {
-        // Create new invitation
-        invitation = await storage.createInvitation({
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          token,
-          invitedBy,
-          expiresAt,
-        });
-      }
+      // Update existing invitation with new token and expiry
+      const invitation = await storage.updateInvitation(existingInvite.id, {
+        token,
+        expiresAt,
+        invitedBy,
+      });
 
       // Get inviter info for email
       const inviter = await storage.getUser(invitedBy);
       const inviterName = inviter?.name || 'An administrator';
 
-      // Send invitation email
+      // Send invitation email using the invitation data
+      const name = existingInvite.name;
+      const role = existingInvite.role;
+      
       try {
-        await sendInvitationEmail(email, user.name, token, inviterName, user.role);
+        await sendInvitationEmail(email, name, token, inviterName, role);
       } catch (emailError) {
         console.error('Failed to send invitation email:', emailError);
         return res.status(201).json({ 
