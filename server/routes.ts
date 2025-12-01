@@ -113,7 +113,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     try {
       const users = await storage.listUsers();
-      res.json(users);
+      // Add hasPassword field to indicate if account is activated
+      const usersWithStatus = users.map(user => ({
+        ...user,
+        hasPassword: !!user.password,
+        password: undefined, // Never expose password hash
+      }));
+      res.json(usersWithStatus);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }

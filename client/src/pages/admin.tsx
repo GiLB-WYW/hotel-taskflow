@@ -1019,6 +1019,7 @@ export default function Admin() {
                         <TableHead className="min-w-[150px]">Email</TableHead>
                         <TableHead className="min-w-[80px]">Role</TableHead>
                         <TableHead className="min-w-[100px]">Group</TableHead>
+                        <TableHead className="min-w-[80px]">Status</TableHead>
                         <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1034,6 +1035,15 @@ export default function Admin() {
                           <TableCell className="text-muted-foreground">{(user as any).email || "-"}</TableCell>
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{user.group || "-"}</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              (user as any).hasPassword 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {(user as any).hasPassword ? 'Activated' : 'Pending'}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button 
