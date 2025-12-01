@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { isToday } from "date-fns";
-import type { Category, Location, User as DbUser } from "@shared/schema";
+import type { Category, Location, User as DbUser, MaintenanceGroup } from "@shared/schema";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,6 +35,11 @@ export default function Dashboard() {
   // Fetch users from API for the user filter dropdown
   const { data: allUsers = [] } = useQuery<DbUser[]>({
     queryKey: ["/api/users"],
+  });
+
+  // Fetch maintenance groups from API
+  const { data: maintenanceGroups = [] } = useQuery<MaintenanceGroup[]>({
+    queryKey: ["/api/maintenance-groups"],
   });
 
   // Get building names for the filter dropdown
@@ -304,6 +309,9 @@ export default function Dashboard() {
                   key={task.id} 
                   task={task} 
                   onClick={() => setLocation(`/task/${task.id}`)}
+                  locations={locations}
+                  users={allUsers}
+                  maintenanceGroups={maintenanceGroups}
                 />
               ))}
             </div>

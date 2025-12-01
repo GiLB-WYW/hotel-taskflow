@@ -1,22 +1,25 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Clock, AlertTriangle, ArrowRight, User as UserIcon } from "lucide-react";
-import { Task, PRIORITIES, USERS, LOCATIONS, MAINTENANCE_GROUPS } from "@/lib/mockData";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { MapPin, Clock, AlertTriangle } from "lucide-react";
+import { Task, PRIORITIES } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import type { Location, User, MaintenanceGroup } from "@shared/schema";
 
 interface TaskCardProps {
   task: Task;
   onClick?: () => void;
+  locations?: Location[];
+  users?: User[];
+  maintenanceGroups?: MaintenanceGroup[];
 }
 
-export function TaskCard({ task, onClick }: TaskCardProps) {
+export function TaskCard({ task, onClick, locations = [], users = [], maintenanceGroups = [] }: TaskCardProps) {
   const priorityConfig = PRIORITIES[task.priority];
-  const location = LOCATIONS.find(l => l.id === task.locationId);
-  const assignedUser = USERS.find(u => u.id === task.assignedTo);
-  const assignedGroup = MAINTENANCE_GROUPS.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
+  const location = locations.find(l => l.id === task.locationId);
+  const assignedUser = users.find(u => u.id === task.assignedTo);
+  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
 
   return (
     <Card 
@@ -68,7 +71,9 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
             {assignedUser ? (
               <div className="flex items-center gap-1.5" title={`Assigned to ${assignedUser.name}`}>
                 <Avatar className="h-5 w-5">
-                  <AvatarFallback className="text-[9px]">{assignedUser.avatar}</AvatarFallback>
+                  <AvatarFallback className="text-[9px]">
+                    {assignedUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
                 </Avatar>
                 <span className="text-xs text-muted-foreground">{assignedUser.name}</span>
               </div>
