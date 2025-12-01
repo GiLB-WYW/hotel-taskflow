@@ -614,7 +614,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const partialSchema = insertTaskSchema.partial();
       const data = partialSchema.parse(req.body);
+      
+      // Get the current task before update to check for changes
+      const currentTask = await storage.getTask(req.params.id);
+      
       const task = await storage.updateTask(req.params.id, data);
+      
+      // Create notifications for relevant users
+      if (currentTask) {
+        // Notify when task is assigned to a new user
+        if (data.assignedTo && data.assignedTo !== currentTask.assignedTo) {
+          await storage.createNotification({
+            userId: data.assignedTo,
+            type: "task_assigned",
+            title: "New Task Assigned",
+            message: `You have been assigned to task: ${task.title}`,
+            taskId: task.id,
+            isRead: false,
+          });
+        }
+        
+        // Notify assigned user when status changes
+        if (data.status && data.status !== currentTask.status && currentTask.assignedTo) {
+          await storage.createNotification({
+            userId: currentTask.assignedTo,
+            type: "status_changed",
+            title: "Task Status Updated",
+            message: `Task "${task.title}" status changed to ${data.status}`,
+            taskId: task.id,
+            isRead: false,
+          });
+        }
+        
+        // Notify task creator when their task is updated
+        if (task.createdBy && task.createdBy !== currentTask.assignedTo) {
+          if (data.status && data.status !== currentTask.status) {
+            await storage.createNotification({
+              userId: task.createdBy,
+              type: "task_updated",
+              title: "Task Updated",
+              message: `Your task "${task.title}" is now ${data.status}`,
+              taskId: task.id,
+              isRead: false,
+            });
+          }
+        }
+      }
+      
       res.json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -644,6 +690,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipients: recipients || [],
       };
       const note = await storage.createNote(noteData);
+      
+      // Get task and creator info for notification
+      const task = await storage.getTask(req.params.taskId);
+      const creator = await storage.getUser(createdBy);
+      
+      // Notify all recipients
+      if (recipients && recipients.length > 0 && task) {
+        for (const recipientId of recipients) {
+          if (recipientId !== createdBy) {
+            await storage.createNotification({
+              userId: recipientId,
+              type: "note_added",
+              title: "New Note Added",
+              message: `${creator?.name || 'Someone'} added a note to task: ${task.title}`,
+              taskId: req.params.taskId,
+              isRead: false,
+            });
+          }
+        }
+      }
+      
+      // Also notify the assigned user if not the creator and not in recipients
+      if (task?.assignedTo && task.assignedTo !== createdBy && !recipients?.includes(task.assignedTo)) {
+        await storage.createNotification({
+          userId: task.assignedTo,
+          type: "note_added",
+          title: "New Note on Your Task",
+          message: `${creator?.name || 'Someone'} added a note to: ${task.title}`,
+          taskId: req.params.taskId,
+          isRead: false,
+        });
+      }
+      
       res.status(201).json(note);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -823,6 +902,43 @@ Respond ONLY with valid JSON in this exact format:
     } catch (error) {
       console.error("AI processing error:", error);
       res.status(500).json({ error: "AI processing failed" });
+    }
+  });
+
+  // Notification routes
+  app.get("/api/notifications/:userId", async (req, res) => {
+    try {
+      const notifications = await storage.listNotificationsByUser(req.params.userId);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/:userId/unread-count", async (req, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount(req.params.userId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notification count" });
+    }
+  });
+
+  app.post("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const notification = await storage.markNotificationRead(req.params.id);
+      res.json(notification);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/:userId/read-all", async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead(req.params.userId);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
     }
   });
 
