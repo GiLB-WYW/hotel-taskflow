@@ -84,6 +84,18 @@ export const invitationsTable = pgTable("invitations", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// Notifications table
+export const notificationsTable = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // User who receives this notification
+  type: varchar("type").notNull(), // task_assigned, task_updated, note_added, status_changed
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  taskId: varchar("task_id"), // Related task ID (for navigation)
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
@@ -121,6 +133,11 @@ export const insertInvitationSchema = createInsertSchema(invitationsTable).omit(
   createdAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notificationsTable).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select types
 export type User = typeof usersTable.$inferSelect;
 export type Category = typeof categoriesTable.$inferSelect;
@@ -129,6 +146,7 @@ export type MaintenanceGroup = typeof maintenanceGroupsTable.$inferSelect;
 export type Task = typeof tasksTable.$inferSelect;
 export type Note = typeof notesTable.$inferSelect;
 export type Invitation = typeof invitationsTable.$inferSelect;
+export type Notification = typeof notificationsTable.$inferSelect;
 
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -138,3 +156,4 @@ export type InsertMaintenanceGroup = z.infer<typeof insertMaintenanceGroupSchema
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
