@@ -5,18 +5,19 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, ArrowUpDown, AlertTriangle, Plus } from "lucide-react";
+import { Search, Filter, ArrowUpDown, AlertTriangle, Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { isToday } from "date-fns";
-import type { Category, Location } from "@shared/schema";
+import type { Category, Location, User as DbUser } from "@shared/schema";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
+  const [userFilter, setUserFilter] = useState("All");
   const [resolvedTodayFilter, setResolvedTodayFilter] = useState(false);
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -29,6 +30,11 @@ export default function Dashboard() {
   // Fetch locations from API
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  // Fetch users from API for the user filter dropdown
+  const { data: allUsers = [] } = useQuery<DbUser[]>({
+    queryKey: ["/api/users"],
   });
 
   // Get building names for the filter dropdown
@@ -102,8 +108,14 @@ export default function Dashboard() {
 
     // If resolved today filter is active, only show tasks resolved today
     const matchesResolvedToday = !resolvedTodayFilter || isResolvedToday(task);
+
+    // Match by user (assigned to or created by)
+    let matchesUser = true;
+    if (userFilter !== "All") {
+      matchesUser = task.assignedTo === userFilter || task.createdBy === userFilter;
+    }
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesResolvedToday;
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesResolvedToday && matchesUser;
   });
 
   // Sort by Priority (Red Flag first), then by creation date (newest first)
@@ -254,6 +266,21 @@ export default function Dashboard() {
                 <SelectItem value="Low">Low</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="w-32 sm:w-40 bg-background text-sm flex-shrink-0">
+                <Users className="h-4 w-4 mr-1" />
+                <SelectValue placeholder="User" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Users</SelectItem>
+                {allUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10 flex-shrink-0">
               <ArrowUpDown className="h-4 w-4" />
@@ -290,7 +317,7 @@ export default function Dashboard() {
               <Button 
                 variant="link" 
                 className="mt-2 text-primary" 
-                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All");}}
+                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All");}}
               >
                 Clear all filters
               </Button>
