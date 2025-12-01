@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus } from "lucide-react";
+import { Plus, Trash2, Edit, Search, Wrench, ExternalLink, FolderTree, Mail, UserPlus, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Location, User, MaintenanceGroup, Category } from "@shared/schema";
@@ -200,6 +200,35 @@ export default function Admin() {
       toast({
         title: "Error",
         description: "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async ({ email, invitedBy }: { email: string; invitedBy: string }) => {
+      const response = await fetch("/api/invitations/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, invitedBy }),
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to resend invitation");
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Invitation Sent",
+        description: data.emailSent 
+          ? "Invitation email has been resent successfully."
+          : "Invitation updated but email could not be sent.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend invitation",
         variant: "destructive",
       });
     },
@@ -430,6 +459,20 @@ export default function Admin() {
 
   const handleDeleteUser = (user: User) => {
     setUserToDelete(user);
+  };
+
+  const handleResendInvitation = (user: User) => {
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const email = (user as any).email;
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "User has no email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    resendInvitationMutation.mutate({ email, invitedBy: currentUser.id });
   };
 
   const confirmDeleteUser = () => {
@@ -996,7 +1039,7 @@ export default function Admin() {
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{user.group || "-"}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1006,6 +1049,17 @@ export default function Admin() {
                                 data-testid={`button-edit-user-${user.id}`}
                               >
                                 <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary hover:text-primary"
+                                onClick={() => handleResendInvitation(user)}
+                                disabled={resendInvitationMutation.isPending}
+                                title="Resend invitation"
+                                data-testid={`button-resend-invite-${user.id}`}
+                              >
+                                <Send className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
