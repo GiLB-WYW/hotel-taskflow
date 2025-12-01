@@ -14,6 +14,8 @@ import {
   type InsertNote,
   type Invitation,
   type InsertInvitation,
+  type Notification,
+  type InsertNotification,
   usersTable,
   categoriesTable,
   locationsTable,
@@ -21,6 +23,7 @@ import {
   tasksTable,
   notesTable,
   invitationsTable,
+  notificationsTable,
   insertUserSchema,
   insertCategorySchema,
   insertLocationSchema,
@@ -28,6 +31,7 @@ import {
   insertTaskSchema,
   insertNoteSchema,
   insertInvitationSchema,
+  insertNotificationSchema,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { ZodError } from "zod";
@@ -96,6 +100,13 @@ export interface IStorage {
   markInvitationAccepted(id: string): Promise<Invitation>;
   listPendingInvitations(): Promise<Invitation[]>;
   deleteInvitation(id: string): Promise<void>;
+
+  // Notifications
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  listNotificationsByUser(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markNotificationRead(id: string): Promise<Notification>;
+  markAllNotificationsRead(userId: string): Promise<void>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -395,6 +406,45 @@ export class PostgresStorage implements IStorage {
 
   async deleteInvitation(id: string): Promise<void> {
     await db.delete(invitationsTable).where(eq(invitationsTable.id, id));
+  }
+
+  // Notification methods
+  async createNotification(data: InsertNotification): Promise<Notification> {
+    const validated = insertNotificationSchema.parse(data);
+    const notification = await db.insert(notificationsTable).values(validated).returning();
+    return notification[0];
+  }
+
+  async listNotificationsByUser(userId: string): Promise<Notification[]> {
+    const notifications = await db.select()
+      .from(notificationsTable)
+      .where(eq(notificationsTable.userId, userId))
+      .orderBy(desc(notificationsTable.createdAt));
+    return notifications;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(notificationsTable)
+      .where(and(
+        eq(notificationsTable.userId, userId),
+        eq(notificationsTable.isRead, false)
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async markNotificationRead(id: string): Promise<Notification> {
+    const notification = await db.update(notificationsTable)
+      .set({ isRead: true })
+      .where(eq(notificationsTable.id, id))
+      .returning();
+    return notification[0];
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db.update(notificationsTable)
+      .set({ isRead: true })
+      .where(eq(notificationsTable.userId, userId));
   }
 }
 
