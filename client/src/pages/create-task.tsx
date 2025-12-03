@@ -7,7 +7,7 @@ import { PRIORITIES } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Location, MaintenanceGroup } from "@shared/schema";
 
 // Steps in the workflow
@@ -25,6 +25,7 @@ export default function CreateTask() {
   const [transcript, setTranscript] = useState("");
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
 
   // Fetch locations from API
   const { data: locations = [] } = useQuery<Location[]>({
@@ -352,12 +353,15 @@ export default function CreateTask() {
         const result = await response.json();
         console.log("Task created successfully:", result);
 
+        // Invalidate tasks cache so dashboard shows the new task immediately
+        await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+
         toast({
           title: "Task Created Successfully",
           description: "The maintenance team has been notified.",
         });
         setStep("success");
-        setTimeout(() => navigate("/"), 2000);
+        setTimeout(() => navigate("/"), 1500);
       } catch (error) {
         console.error("Submit task error:", error);
         toast({
