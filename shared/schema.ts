@@ -10,7 +10,7 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password"), // Hashed password (bcrypt), optional for OAuth users
   role: varchar("role").notNull().default("Basic Staff"), // Admin, Manager, Personnel, Basic Staff
-  group: varchar("group"), // Maintenance group ID
+  groups: text("groups").array(), // Array of maintenance group IDs (user can be in multiple groups)
   authProvider: varchar("auth_provider").default("email"), // email, google, microsoft
   authId: text("auth_id"), // External ID for OAuth
   avatar: text("avatar"),

@@ -40,7 +40,7 @@ export default function Admin() {
   const [newCategory, setNewCategory] = useState({ name: "", description: "" });
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editUserForm, setEditUserForm] = useState({ name: "", email: "", role: "", password: "" });
+  const [editUserForm, setEditUserForm] = useState({ name: "", email: "", role: "", password: "", groups: [] as string[] });
   const [editCategoryForm, setEditCategoryForm] = useState({ name: "", description: "" });
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "Basic Staff" });
 
@@ -154,7 +154,7 @@ export default function Admin() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name?: string; email?: string; role?: string; password?: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; email?: string; role?: string; password?: string; groups?: string[] } }) => {
       const response = await fetch(`/api/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -166,9 +166,10 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
       setIsEditUserDialogOpen(false);
       setEditingUser(null);
-      setEditUserForm({ name: "", email: "", role: "", password: "" });
+      setEditUserForm({ name: "", email: "", role: "", password: "", groups: [] });
       toast({
         title: "Success",
         description: "User updated successfully",
@@ -438,6 +439,7 @@ export default function Admin() {
       email: (user as any).email || "",
       role: user.role,
       password: "",
+      groups: (user as any).groups || [],
     });
     setIsEditUserDialogOpen(true);
   };
@@ -450,6 +452,8 @@ export default function Admin() {
     if (editUserForm.email && editUserForm.email !== (editingUser as any).email) updates.email = editUserForm.email;
     if (editUserForm.role && editUserForm.role !== editingUser.role) updates.role = editUserForm.role;
     if (editUserForm.password) updates.password = editUserForm.password;
+    // Always update groups to handle adding/removing
+    updates.groups = editUserForm.groups;
 
     if (Object.keys(updates).length === 0) {
       toast({
@@ -1034,7 +1038,15 @@ export default function Admin() {
                           </TableCell>
                           <TableCell className="text-muted-foreground">{(user as any).email || "-"}</TableCell>
                           <TableCell>{user.role}</TableCell>
-                          <TableCell>{user.group || "-"}</TableCell>
+                          <TableCell>
+                            {(user as any).groups && (user as any).groups.length > 0 
+                              ? (user as any).groups.map((groupId: string) => {
+                                  const grp = groups.find((g: MaintenanceGroup) => g.id === groupId);
+                                  return grp?.name || groupId;
+                                }).join(", ")
+                              : "-"
+                            }
+                          </TableCell>
                           <TableCell>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               (user as any).hasPassword 
@@ -1277,6 +1289,42 @@ export default function Admin() {
                   onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })}
                   data-testid="input-edit-user-password"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Maintenance Groups</Label>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                  {groups.map((grp: MaintenanceGroup) => (
+                    <label 
+                      key={grp.id} 
+                      className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={editUserForm.groups.includes(grp.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditUserForm({ 
+                              ...editUserForm, 
+                              groups: [...editUserForm.groups, grp.id] 
+                            });
+                          } else {
+                            setEditUserForm({ 
+                              ...editUserForm, 
+                              groups: editUserForm.groups.filter(g => g !== grp.id) 
+                            });
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        data-testid={`checkbox-group-${grp.id}`}
+                      />
+                      <span className="text-sm">{grp.name}</span>
+                    </label>
+                  ))}
+                  {groups.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No maintenance groups available</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Select all groups this user belongs to</p>
               </div>
             </div>
             <DialogFooter>
