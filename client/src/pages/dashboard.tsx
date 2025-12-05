@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
   const [userFilter, setUserFilter] = useState("All");
+  const [groupFilter, setGroupFilter] = useState("All");
   const [resolvedTodayFilter, setResolvedTodayFilter] = useState(false);
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -119,8 +120,14 @@ export default function Dashboard() {
     if (userFilter !== "All") {
       matchesUser = task.assignedTo === userFilter || task.createdBy === userFilter;
     }
+
+    // Match by maintenance group
+    let matchesGroup = true;
+    if (groupFilter !== "All") {
+      matchesGroup = task.assignedGroup === groupFilter;
+    }
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesResolvedToday && matchesUser;
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesResolvedToday && matchesUser && matchesGroup;
   });
 
   // Sort by Priority (Red Flag first), then by creation date (newest first)
@@ -286,6 +293,20 @@ export default function Dashboard() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={groupFilter} onValueChange={setGroupFilter}>
+              <SelectTrigger className="w-32 sm:w-40 bg-background text-sm flex-shrink-0" data-testid="select-group-filter">
+                <SelectValue placeholder="Group" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Groups</SelectItem>
+                {maintenanceGroups.map(group => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10 flex-shrink-0">
               <ArrowUpDown className="h-4 w-4" />
@@ -325,7 +346,7 @@ export default function Dashboard() {
               <Button 
                 variant="link" 
                 className="mt-2 text-primary" 
-                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All");}}
+                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All"); setGroupFilter("All");}}
               >
                 Clear all filters
               </Button>
