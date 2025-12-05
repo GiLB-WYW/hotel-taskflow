@@ -1,11 +1,11 @@
 import { useLocation, useRoute } from "wouter";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITIES, Task } from "@/lib/mockData";
-import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +59,12 @@ export default function TaskDetail() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
+  // Touch swipe state
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minSwipeDistance = 50;
+  
   // Get current user from localStorage
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   
@@ -86,6 +92,78 @@ export default function TaskDetail() {
   const { data: maintenanceGroups = [] } = useQuery<MaintenanceGroup[]>({
     queryKey: ["/api/maintenance-groups"],
   });
+
+  // Fetch all tasks for navigation
+  const { data: allTasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks"],
+  });
+
+  // Sort tasks by priority then by date (same as dashboard)
+  const sortedTasks = [...allTasks].sort((a, b) => {
+    const priorityOrder: Record<string, number> = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
+    const priorityDiff = (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4);
+    if (priorityDiff !== 0) return priorityDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  // Find current task index and adjacent tasks
+  const currentIndex = sortedTasks.findIndex(t => t.id === params?.id);
+  const prevTask = currentIndex > 0 ? sortedTasks[currentIndex - 1] : null;
+  const nextTask = currentIndex < sortedTasks.length - 1 ? sortedTasks[currentIndex + 1] : null;
+
+  // Navigation functions
+  const goToPrevTask = useCallback(() => {
+    if (prevTask) {
+      setLocation(`/task/${prevTask.id}`);
+    }
+  }, [prevTask, setLocation]);
+
+  const goToNextTask = useCallback(() => {
+    if (nextTask) {
+      setLocation(`/task/${nextTask.id}`);
+    }
+  }, [nextTask, setLocation]);
+
+  // Touch event handlers for swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchEndX.current = null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe && nextTask) {
+      goToNextTask();
+    } else if (isRightSwipe && prevTask) {
+      goToPrevTask();
+    }
+    
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && prevTask) {
+        goToPrevTask();
+      } else if (e.key === "ArrowRight" && nextTask) {
+        goToNextTask();
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [prevTask, nextTask, goToPrevTask, goToNextTask]);
 
   // Mutation to update task
   const updateTaskMutation = useMutation({
@@ -311,7 +389,60 @@ export default function TaskDetail() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+      <div 
+        ref={containerRef}
+        className="max-w-4xl mx-auto space-y-4 sm:space-y-6 relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Task Navigation Arrows - Fixed on sides */}
+        {sortedTasks.length > 1 && (
+          <>
+            {/* Previous Task Arrow */}
+            <button
+              onClick={goToPrevTask}
+              disabled={!prevTask}
+              className={cn(
+                "fixed left-2 top-1/2 -translate-y-1/2 z-40 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border shadow-lg flex items-center justify-center transition-all",
+                prevTask 
+                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer" 
+                  : "opacity-30 cursor-not-allowed"
+              )}
+              data-testid="button-prev-task"
+              aria-label="Previous Task"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            
+            {/* Next Task Arrow */}
+            <button
+              onClick={goToNextTask}
+              disabled={!nextTask}
+              className={cn(
+                "fixed right-2 top-1/2 -translate-y-1/2 z-40 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border shadow-lg flex items-center justify-center transition-all",
+                nextTask 
+                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer" 
+                  : "opacity-30 cursor-not-allowed"
+              )}
+              data-testid="button-next-task"
+              aria-label="Next Task"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </>
+        )}
+
+        {/* Task Counter */}
+        {sortedTasks.length > 1 && currentIndex >= 0 && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-sm border rounded-full px-4 py-2 shadow-lg text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{currentIndex + 1}</span>
+            <span> of </span>
+            <span className="font-semibold text-foreground">{sortedTasks.length}</span>
+            <span className="ml-2 text-xs hidden sm:inline">← Swipe or use arrow keys →</span>
+          </div>
+        )}
+
         {/* Hidden content for PDF export */}
         <div id="pdf-content" style={{ display: 'none' }}>
           <div style={{ backgroundColor: '#ffffff', padding: '48px' }}>
