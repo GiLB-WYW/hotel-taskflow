@@ -172,8 +172,14 @@ export default function Dashboard() {
         {/* Stats Overview - Clickable Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           <div 
-            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => { setStatusFilter("Open"); }}
+            className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${statusFilter === "Open" ? 'border-primary bg-primary/5' : 'border-border'}`}
+            onClick={() => {
+              if (statusFilter === "Open") {
+                setStatusFilter("All");
+              } else {
+                setStatusFilter("Open");
+              }
+            }}
             data-testid="card-open-tasks"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open Tasks</p>
@@ -183,8 +189,15 @@ export default function Dashboard() {
             </div>
           </div>
           <div 
-            className="bg-card border border-red-200 bg-red-50/50 rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => { setPriorityFilter("Red Flag"); setStatusFilter("All"); }}
+            className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${priorityFilter === "Red Flag" ? 'border-red-500 bg-red-100/70 ring-2 ring-red-300' : 'border-red-200 bg-red-50/50'}`}
+            onClick={() => {
+              if (priorityFilter === "Red Flag") {
+                setPriorityFilter("All");
+              } else {
+                setPriorityFilter("Red Flag");
+                setStatusFilter("All");
+              }
+            }}
             data-testid="card-critical"
           >
             <div className="flex items-center justify-between">
@@ -197,8 +210,14 @@ export default function Dashboard() {
             </div>
           </div>
           <div 
-            className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
-            onClick={() => { setStatusFilter("In Progress"); }}
+            className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${statusFilter === "In Progress" ? 'border-blue-400 bg-blue-50/50' : 'border-border'}`}
+            onClick={() => {
+              if (statusFilter === "In Progress") {
+                setStatusFilter("All");
+              } else {
+                setStatusFilter("In Progress");
+              }
+            }}
             data-testid="card-in-progress"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">In Progress</p>
