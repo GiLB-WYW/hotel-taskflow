@@ -92,13 +92,18 @@ export function NotificationDropdown() {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
     }
-    if (notification.taskId) {
+    // For Red Flag notifications, navigate to dashboard with Red Flag filter
+    if (notification.type === "red_flag_assigned") {
+      setLocation(`/?priority=Red+Flag&user=${userId}`);
+    } else if (notification.taskId) {
       setLocation(`/tasks?taskId=${notification.taskId}`);
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
+      case "red_flag_assigned":
+        return "bg-red-600 animate-pulse";
       case "task_assigned":
         return "bg-blue-500";
       case "status_changed":
@@ -244,7 +249,10 @@ export function MobileNotificationBell() {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
     }
-    if (notification.taskId) {
+    // For Red Flag notifications, navigate to dashboard with Red Flag filter
+    if (notification.type === "red_flag_assigned") {
+      setLocation(`/?priority=Red+Flag&user=${userId}`);
+    } else if (notification.taskId) {
       setLocation(`/tasks?taskId=${notification.taskId}`);
     }
     setIsOpen(false);
@@ -252,6 +260,8 @@ export function MobileNotificationBell() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
+      case "red_flag_assigned":
+        return "bg-red-600 animate-pulse";
       case "task_assigned":
         return "bg-blue-500";
       case "status_changed":

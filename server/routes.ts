@@ -630,11 +630,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentTask) {
         // Notify when task is assigned to a new user
         if (data.assignedTo && data.assignedTo !== currentTask.assignedTo) {
+          // Check if this is a Red Flag task and get count
+          const isRedFlag = task.priority === "Red Flag";
+          let notificationMessage = `You have been assigned to task: ${task.title}`;
+          let notificationType = "task_assigned";
+          
+          if (isRedFlag) {
+            const redFlagCount = await storage.getRedFlagTaskCountForUser(data.assignedTo);
+            notificationMessage = `URGENT: You have been assigned a Red Flag task: ${task.title}. You now have ${redFlagCount} critical task${redFlagCount !== 1 ? 's' : ''} requiring immediate attention.`;
+            notificationType = "red_flag_assigned";
+          }
+          
           await storage.createNotification({
             userId: data.assignedTo,
-            type: "task_assigned",
-            title: "New Task Assigned",
-            message: `You have been assigned to task: ${task.title}`,
+            type: notificationType,
+            title: isRedFlag ? "Critical Task Assigned" : "New Task Assigned",
+            message: notificationMessage,
             taskId: task.id,
             isRead: false,
           });

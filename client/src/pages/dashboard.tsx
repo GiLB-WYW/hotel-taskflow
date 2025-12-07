@@ -7,19 +7,31 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, ArrowUpDown, AlertTriangle, Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Category, Location, User as DbUser, MaintenanceGroup } from "@shared/schema";
 
 export default function Dashboard() {
+  const searchParams = useSearch();
+  const urlParams = new URLSearchParams(searchParams);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState(urlParams.get("priority") || "All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
-  const [userFilter, setUserFilter] = useState("All");
+  const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
   const [groupFilter, setGroupFilter] = useState("All");
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // Update filters when URL parameters change
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    const priority = params.get("priority");
+    const user = params.get("user");
+    if (priority) setPriorityFilter(priority);
+    if (user) setUserFilter(user);
+  }, [searchParams]);
 
   // Fetch categories (buildings) from API
   const { data: categories = [] } = useQuery<Category[]>({

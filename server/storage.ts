@@ -107,6 +107,9 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationRead(id: string): Promise<Notification>;
   markAllNotificationsRead(userId: string): Promise<void>;
+
+  // Task statistics
+  getRedFlagTaskCountForUser(userId: string): Promise<number>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -445,6 +448,17 @@ export class PostgresStorage implements IStorage {
     await db.update(notificationsTable)
       .set({ isRead: true })
       .where(eq(notificationsTable.userId, userId));
+  }
+
+  async getRedFlagTaskCountForUser(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(tasksTable)
+      .where(and(
+        eq(tasksTable.assignedTo, userId),
+        eq(tasksTable.priority, "Red Flag"),
+        sql`${tasksTable.status} != 'Resolved'`
+      ));
+    return Number(result[0]?.count || 0);
   }
 }
 
