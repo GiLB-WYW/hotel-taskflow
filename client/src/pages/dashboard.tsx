@@ -131,10 +131,12 @@ export default function Dashboard() {
       matchesUser = task.assignedTo === userFilter;
     }
 
-    // Match by maintenance group
+    // Match by maintenance group (check both ID and name for backwards compatibility)
     let matchesGroup = true;
     if (groupFilter !== "All") {
-      matchesGroup = task.assignedGroup === groupFilter;
+      const selectedGroup = maintenanceGroups.find(g => g.id === groupFilter);
+      matchesGroup = task.assignedGroup === groupFilter || 
+        (selectedGroup ? task.assignedGroup === selectedGroup.name : false);
     }
     
     return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesUser && matchesGroup;
