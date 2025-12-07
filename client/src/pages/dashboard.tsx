@@ -113,10 +113,10 @@ export default function Dashboard() {
       matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
     }
 
-    // Match by user (assigned to or created by)
+    // Match by user (assigned to only)
     let matchesUser = true;
     if (userFilter !== "All") {
-      matchesUser = task.assignedTo === userFilter || task.createdBy === userFilter;
+      matchesUser = task.assignedTo === userFilter;
     }
 
     // Match by maintenance group
