@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITIES, Task } from "@/lib/mockData";
-import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +59,13 @@ export default function TaskDetail() {
   const [isChangeGroupDialogOpen, setIsChangeGroupDialogOpen] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
+  const [editTaskForm, setEditTaskForm] = useState({
+    title: "",
+    description: "",
+    priority: "",
+    locationId: "",
+  });
   const queryClient = useQueryClient();
   
   // Touch swipe state
@@ -276,6 +285,33 @@ export default function TaskDetail() {
       toast({ title: "Success", description: "Assigned group updated." });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update assigned group.", variant: "destructive" });
+    }
+  };
+
+  const handleOpenEditDialog = () => {
+    if (task) {
+      setEditTaskForm({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        locationId: task.locationId,
+      });
+      setIsEditTaskDialogOpen(true);
+    }
+  };
+
+  const handleSaveTaskEdit = async () => {
+    try {
+      await updateTaskMutation.mutateAsync({
+        title: editTaskForm.title,
+        description: editTaskForm.description,
+        priority: editTaskForm.priority,
+        locationId: editTaskForm.locationId,
+      });
+      setIsEditTaskDialogOpen(false);
+      toast({ title: "Success", description: "Task updated successfully." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update task.", variant: "destructive" });
     }
   };
   
@@ -755,6 +791,14 @@ export default function TaskDetail() {
                </Button>
                <Button 
                  variant="outline" 
+                 className="w-full"
+                 onClick={handleOpenEditDialog}
+                 data-testid="button-edit-task"
+               >
+                 <Pencil className="h-4 w-4 mr-2" /> Edit Task
+               </Button>
+               <Button 
+                 variant="outline" 
                  className="w-full border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
                  onClick={() => markResolvedMutation.mutate()}
                  disabled={markResolvedMutation.isPending || task.status === "Resolved"}
@@ -874,6 +918,85 @@ export default function TaskDetail() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
+        <DialogContent className="max-w-lg" data-testid="dialog-edit-task">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editTaskForm.title}
+                onChange={(e) => setEditTaskForm({ ...editTaskForm, title: e.target.value })}
+                placeholder="Enter task title"
+                data-testid="input-edit-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editTaskForm.description}
+                onChange={(e) => setEditTaskForm({ ...editTaskForm, description: e.target.value })}
+                placeholder="Enter task description"
+                rows={4}
+                data-testid="input-edit-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-priority">Priority</Label>
+              <Select 
+                value={editTaskForm.priority} 
+                onValueChange={(value) => setEditTaskForm({ ...editTaskForm, priority: value })}
+              >
+                <SelectTrigger data-testid="select-edit-priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Red Flag">Red Flag</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Normal">Normal</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Location</Label>
+              <Select 
+                value={editTaskForm.locationId} 
+                onValueChange={(value) => setEditTaskForm({ ...editTaskForm, locationId: value })}
+              >
+                <SelectTrigger data-testid="select-edit-location">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsEditTaskDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveTaskEdit}
+              disabled={updateTaskMutation.isPending}
+              data-testid="button-save-task-edit"
+            >
+              {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
