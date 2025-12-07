@@ -435,12 +435,12 @@ export default function TaskDetail() {
         {/* Task Navigation Arrows - Visible on desktop, hidden on mobile (mobile uses swipe) */}
         {sortedTasks.length > 1 && (
           <>
-            {/* Previous Task Arrow - Desktop only */}
+            {/* Previous Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToPrevTask}
               disabled={!prevTask}
               className={cn(
-                "hidden md:flex fixed left-4 lg:left-8 top-1/2 -translate-y-1/2 z-40 h-14 w-14 rounded-full bg-background border-2 shadow-xl items-center justify-center transition-all",
+                "hidden md:flex absolute -left-16 lg:-left-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all",
                 prevTask 
                   ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
                   : "opacity-30 cursor-not-allowed border-muted"
@@ -448,15 +448,15 @@ export default function TaskDetail() {
               data-testid="button-prev-task"
               aria-label="Previous Task"
             >
-              <ChevronLeft className="h-7 w-7" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
             
-            {/* Next Task Arrow - Desktop only */}
+            {/* Next Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToNextTask}
               disabled={!nextTask}
               className={cn(
-                "hidden md:flex fixed right-4 lg:right-8 top-1/2 -translate-y-1/2 z-40 h-14 w-14 rounded-full bg-background border-2 shadow-xl items-center justify-center transition-all",
+                "hidden md:flex absolute -right-16 lg:-right-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all",
                 nextTask 
                   ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
                   : "opacity-30 cursor-not-allowed border-muted"
@@ -464,7 +464,7 @@ export default function TaskDetail() {
               data-testid="button-next-task"
               aria-label="Next Task"
             >
-              <ChevronRight className="h-7 w-7" />
+              <ChevronRight className="h-6 w-6" />
             </button>
           </>
         )}
