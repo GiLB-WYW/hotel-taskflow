@@ -234,7 +234,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async listLocations(): Promise<Location[]> {
-    return await db.select().from(locationsTable);
+    return await db.select().from(locationsTable).orderBy(locationsTable.category, locationsTable.name);
   }
 
   async getMaintenanceGroup(id: string): Promise<MaintenanceGroup | undefined> {
