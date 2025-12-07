@@ -24,13 +24,14 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Update filters when URL parameters change
+  // Update filters when URL parameters change (including reset when params are removed)
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     const priority = params.get("priority");
     const user = params.get("user");
-    if (priority) setPriorityFilter(priority);
-    if (user) setUserFilter(user);
+    // Set or reset filters based on URL params
+    setPriorityFilter(priority || "All");
+    setUserFilter(user || "All");
   }, [searchParams]);
 
   // Fetch categories (buildings) from API
