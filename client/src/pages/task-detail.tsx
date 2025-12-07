@@ -432,39 +432,39 @@ export default function TaskDetail() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Task Navigation Arrows - Fixed on sides */}
+        {/* Task Navigation Arrows - Visible on desktop, hidden on mobile (mobile uses swipe) */}
         {sortedTasks.length > 1 && (
           <>
-            {/* Previous Task Arrow */}
+            {/* Previous Task Arrow - Desktop only */}
             <button
               onClick={goToPrevTask}
               disabled={!prevTask}
               className={cn(
-                "fixed left-2 top-1/2 -translate-y-1/2 z-40 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border shadow-lg flex items-center justify-center transition-all",
+                "hidden md:flex fixed left-4 lg:left-8 top-1/2 -translate-y-1/2 z-40 h-14 w-14 rounded-full bg-background border-2 shadow-xl items-center justify-center transition-all",
                 prevTask 
-                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer" 
-                  : "opacity-30 cursor-not-allowed"
+                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
+                  : "opacity-30 cursor-not-allowed border-muted"
               )}
               data-testid="button-prev-task"
               aria-label="Previous Task"
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-7 w-7" />
             </button>
             
-            {/* Next Task Arrow */}
+            {/* Next Task Arrow - Desktop only */}
             <button
               onClick={goToNextTask}
               disabled={!nextTask}
               className={cn(
-                "fixed right-2 top-1/2 -translate-y-1/2 z-40 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border shadow-lg flex items-center justify-center transition-all",
+                "hidden md:flex fixed right-4 lg:right-8 top-1/2 -translate-y-1/2 z-40 h-14 w-14 rounded-full bg-background border-2 shadow-xl items-center justify-center transition-all",
                 nextTask 
-                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer" 
-                  : "opacity-30 cursor-not-allowed"
+                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
+                  : "opacity-30 cursor-not-allowed border-muted"
               )}
               data-testid="button-next-task"
               aria-label="Next Task"
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-7 w-7" />
             </button>
           </>
         )}
@@ -475,7 +475,8 @@ export default function TaskDetail() {
             <span className="font-semibold text-foreground">{currentIndex + 1}</span>
             <span> of </span>
             <span className="font-semibold text-foreground">{sortedTasks.length}</span>
-            <span className="ml-2 text-xs hidden sm:inline">← Swipe or use arrow keys →</span>
+            <span className="ml-2 text-xs md:hidden">← Swipe to navigate →</span>
+            <span className="ml-2 text-xs hidden md:inline">← Use arrows or keyboard →</span>
           </div>
         )}
 
