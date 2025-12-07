@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PRIORITIES, Task } from "@/lib/mockData";
+import { PRIORITIES, Task, type Priority } from "@/lib/mockData";
 import { ArrowLeft, Calendar, MapPin, User, Download, MessageSquare, CheckCircle2, Search, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -305,7 +305,7 @@ export default function TaskDetail() {
       await updateTaskMutation.mutateAsync({
         title: editTaskForm.title,
         description: editTaskForm.description,
-        priority: editTaskForm.priority,
+        priority: editTaskForm.priority as Priority,
         locationId: editTaskForm.locationId,
       });
       setIsEditTaskDialogOpen(false);
