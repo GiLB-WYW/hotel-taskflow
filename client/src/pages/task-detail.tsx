@@ -1,4 +1,4 @@
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ interface MaintenanceGroup {
 export default function TaskDetail() {
   const [, params] = useRoute("/task/:id");
   const [, setLocation] = useLocation();
+  const searchParams = useSearch();
+  const filterParams = new URLSearchParams(searchParams);
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
@@ -107,8 +109,54 @@ export default function TaskDetail() {
     queryKey: ["/api/tasks"],
   });
 
+  // Get filter params from URL
+  const statusFilter = filterParams.get("status");
+  const priorityFilterParam = filterParams.get("priority");
+  const locationFilter = filterParams.get("location");
+  const userFilterParam = filterParams.get("user");
+  const groupFilter = filterParams.get("group");
+  
+  // Build query string to preserve in navigation
+  const queryString = searchParams ? `?${searchParams}` : "";
+
+  // Filter tasks based on URL params (same logic as dashboard)
+  const filteredTasks = allTasks.filter(taskItem => {
+    // By default, hide resolved tasks unless explicitly filtering for them
+    let matchesStatus = true;
+    if (!statusFilter) {
+      matchesStatus = taskItem.status !== "Resolved";
+    } else {
+      matchesStatus = taskItem.status === statusFilter;
+    }
+    
+    const matchesPriority = !priorityFilterParam || taskItem.priority === priorityFilterParam;
+    
+    // Match by location category
+    let matchesLocationCategory = true;
+    if (locationFilter) {
+      const taskLocation = locations.find(l => l.id === taskItem.locationId);
+      matchesLocationCategory = taskLocation?.category === locationFilter;
+    }
+
+    // Match by user (assigned to only)
+    let matchesUser = true;
+    if (userFilterParam) {
+      matchesUser = taskItem.assignedTo === userFilterParam;
+    }
+
+    // Match by maintenance group (check both ID and name)
+    let matchesGroup = true;
+    if (groupFilter) {
+      const selectedGroup = maintenanceGroups.find(g => g.id === groupFilter);
+      matchesGroup = taskItem.assignedGroup === groupFilter || 
+        (selectedGroup ? taskItem.assignedGroup === selectedGroup.name : false);
+    }
+    
+    return matchesStatus && matchesPriority && matchesLocationCategory && matchesUser && matchesGroup;
+  });
+
   // Sort tasks by priority then by date (same as dashboard)
-  const sortedTasks = [...allTasks].sort((a, b) => {
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
     const priorityOrder: Record<string, number> = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
     const priorityDiff = (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4);
     if (priorityDiff !== 0) return priorityDiff;
@@ -120,18 +168,18 @@ export default function TaskDetail() {
   const prevTask = currentIndex > 0 ? sortedTasks[currentIndex - 1] : null;
   const nextTask = currentIndex < sortedTasks.length - 1 ? sortedTasks[currentIndex + 1] : null;
 
-  // Navigation functions
+  // Navigation functions (preserve filter params)
   const goToPrevTask = useCallback(() => {
     if (prevTask) {
-      setLocation(`/task/${prevTask.id}`);
+      setLocation(`/task/${prevTask.id}${queryString}`);
     }
-  }, [prevTask, setLocation]);
+  }, [prevTask, setLocation, queryString]);
 
   const goToNextTask = useCallback(() => {
     if (nextTask) {
-      setLocation(`/task/${nextTask.id}`);
+      setLocation(`/task/${nextTask.id}${queryString}`);
     }
-  }, [nextTask, setLocation]);
+  }, [nextTask, setLocation, queryString]);
 
   // Touch event handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -208,7 +256,7 @@ export default function TaskDetail() {
         title: "Task Marked Resolved",
         description: "Task status has been updated to Resolved.",
       });
-      setTimeout(() => setLocation("/"), 1000);
+      setTimeout(() => setLocation(`/${queryString}`), 1000);
     },
     onError: () => {
       toast({
@@ -234,7 +282,7 @@ export default function TaskDetail() {
         title: "Task Deleted",
         description: "The task has been permanently deleted.",
       });
-      setLocation("/");
+      setLocation(`/${queryString}`);
     },
     onError: () => {
       toast({
@@ -330,7 +378,7 @@ export default function TaskDetail() {
       <Layout>
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <h2 className="text-xl font-bold text-muted-foreground">Task not found</h2>
-          <Button variant="link" onClick={() => setLocation("/")}>Return to Dashboard</Button>
+          <Button variant="link" onClick={() => setLocation(`/${queryString}`)}>Return to Dashboard</Button>
         </div>
       </Layout>
     );
@@ -579,7 +627,7 @@ export default function TaskDetail() {
         <Button 
           variant="ghost" 
           className="pl-0 hover:bg-transparent hover:text-primary h-9"
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation(`/${queryString}`)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Back to Dashboard</span>

@@ -355,16 +355,28 @@ export default function Dashboard() {
           
           {sortedTasks.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {sortedTasks.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  onClick={() => setLocation(`/task/${task.id}`)}
-                  locations={locations}
-                  users={allUsers}
-                  maintenanceGroups={maintenanceGroups}
-                />
-              ))}
+              {sortedTasks.map(task => {
+                // Build filter query string to preserve context when navigating to task
+                const filterParams = new URLSearchParams();
+                if (statusFilter !== "All") filterParams.set("status", statusFilter);
+                if (priorityFilter !== "All") filterParams.set("priority", priorityFilter);
+                if (locationCategoryFilter !== "All") filterParams.set("location", locationCategoryFilter);
+                if (userFilter !== "All") filterParams.set("user", userFilter);
+                if (groupFilter !== "All") filterParams.set("group", groupFilter);
+                const queryString = filterParams.toString();
+                const taskUrl = `/task/${task.id}${queryString ? `?${queryString}` : ""}`;
+                
+                return (
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    onClick={() => setLocation(taskUrl)}
+                    locations={locations}
+                    users={allUsers}
+                    maintenanceGroups={maintenanceGroups}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
