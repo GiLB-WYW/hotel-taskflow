@@ -197,6 +197,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user profile (for logged-in user to update their own info)
+  app.patch("/api/profile", async (req, res) => {
+    try {
+      const { userId, name } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const updatedUser = await storage.updateUser(userId, { name: name.trim() });
+      
+      // Don't send password hash to client
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
   // Invitation routes
   app.post("/api/invitations", async (req, res) => {
     try {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,16 +6,62 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { Lock, User, Loader2, CheckCircle } from "lucide-react";
-import { getAuthUser } from "@/lib/auth";
+import { Lock, User, Loader2, CheckCircle, Pencil, Save, X } from "lucide-react";
+import { getAuthUser, setAuthUser } from "@/lib/auth";
 
 export default function Settings() {
   const { toast } = useToast();
   const user = getAuthUser();
   
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState(user?.name || "");
+  
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  
+  useEffect(() => {
+    if (user?.name) {
+      setEditName(user.name);
+    }
+  }, [user?.name]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          name,
+        }),
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update profile");
+      }
+      return response.json();
+    },
+    onSuccess: (updatedUser) => {
+      // Update local storage with new user data
+      setAuthUser(updatedUser);
+      setIsEditingName(false);
+      toast({
+        title: "Profile Updated",
+        description: "Your name has been updated successfully.",
+      });
+      // Force page refresh to update sidebar
+      window.location.reload();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const changePasswordMutation = useMutation({
     mutationFn: async () => {
@@ -95,7 +141,59 @@ export default function Settings() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground text-sm">Name</Label>
-                  <p className="font-medium" data-testid="text-settings-name">{user?.name || "N/A"}</p>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Enter your name"
+                        className="h-8"
+                        data-testid="input-edit-name"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (editName.trim()) {
+                            updateProfileMutation.mutate(editName);
+                          }
+                        }}
+                        disabled={updateProfileMutation.isPending || !editName.trim()}
+                        data-testid="button-save-name"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditName(user?.name || "");
+                          setIsEditingName(false);
+                        }}
+                        disabled={updateProfileMutation.isPending}
+                        data-testid="button-cancel-edit-name"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium" data-testid="text-settings-name">{user?.name || "N/A"}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingName(true)}
+                        className="h-6 w-6 p-0"
+                        data-testid="button-edit-name"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-muted-foreground text-sm">Role</Label>
