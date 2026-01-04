@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { logout, getAuthUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationDropdown, MobileNotificationBell } from "@/components/ui/notification-dropdown";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -185,6 +186,8 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
           </div>
         </div>
       </main>
+      
+      <PWAInstallPrompt />
     </div>
   );
 }
