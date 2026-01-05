@@ -5,7 +5,7 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, ArrowUpDown, AlertTriangle, Plus, Users } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -338,8 +338,22 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
             
-            <Button variant="ghost" size="icon" className="text-muted-foreground h-10 w-10 flex-shrink-0">
-              <ArrowUpDown className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-muted-foreground h-10 w-10 flex-shrink-0 hover:text-primary"
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("All");
+                setPriorityFilter("All");
+                setUserFilter("All");
+                setLocationCategoryFilter("All");
+                setGroupFilter("All");
+              }}
+              title="Reset all filters"
+              data-testid="button-reset-filters"
+            >
+              <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
         </div>
