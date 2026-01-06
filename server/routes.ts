@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertTaskSchema, insertLocationSchema, insertMaintenanceGroupSchema, insertCategorySchema } from "@shared/schema";
+import { insertUserSchema, insertTaskSchema, insertLocationSchema, insertMaintenanceGroupSchema, insertCategorySchema, insertActivityLogSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendInvitationEmail } from "./email";
 import crypto from "crypto";
@@ -987,6 +987,55 @@ Respond ONLY with valid JSON in this exact format:
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
       res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Activity Log routes
+  app.get("/api/activity-log", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const entries = await storage.listActivityLogs(
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(entries);
+    } catch (error) {
+      console.error("Failed to fetch activity log:", error);
+      res.status(500).json({ error: "Failed to fetch activity log" });
+    }
+  });
+
+  app.post("/api/activity-log", async (req, res) => {
+    try {
+      const data = insertActivityLogSchema.parse(req.body);
+      const entry = await storage.createActivityLog(data);
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Failed to create activity log entry:", error);
+      res.status(500).json({ error: "Failed to create activity log entry" });
+    }
+  });
+
+  app.put("/api/activity-log/:id", async (req, res) => {
+    try {
+      const entry = await storage.updateActivityLog(req.params.id, req.body);
+      res.json(entry);
+    } catch (error) {
+      console.error("Failed to update activity log entry:", error);
+      res.status(500).json({ error: "Failed to update activity log entry" });
+    }
+  });
+
+  app.delete("/api/activity-log/:id", async (req, res) => {
+    try {
+      await storage.deleteActivityLog(req.params.id);
+      res.json({ message: "Activity log entry deleted" });
+    } catch (error) {
+      console.error("Failed to delete activity log entry:", error);
+      res.status(500).json({ error: "Failed to delete activity log entry" });
     }
   });
 
