@@ -277,10 +277,10 @@ export default function Dashboard() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Status</SelectItem>
+                <SelectItem value="All">Active Tasks</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Resolved">Resolved</SelectItem>
+                <SelectItem value="Resolved">Archived</SelectItem>
               </SelectContent>
             </Select>
 
