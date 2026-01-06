@@ -5,8 +5,11 @@ import { insertUserSchema, insertTaskSchema, insertLocationSchema, insertMainten
 import { z } from "zod";
 import { sendInvitationEmail } from "./email";
 import crypto from "crypto";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
   // Authentication routes
   app.post("/api/auth/register", async (req, res) => {
     try {

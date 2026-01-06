@@ -57,6 +57,8 @@ export const tasksTable = pgTable("tasks", {
   assignedGroup: varchar("assigned_group"), // Maintenance group ID
   createdBy: varchar("created_by").notNull(), // User ID
   imageUrl: text("image_url"),
+  attachmentUrl: text("attachment_url"), // Uploaded file attachment
+  linkUrl: text("link_url"), // External URL reference
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

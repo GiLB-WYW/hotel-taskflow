@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, Square, Camera, RotateCcw, Check, Loader2, Play, Pause } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Mic, Square, Camera, RotateCcw, Check, Loader2, Play, Pause, Paperclip, Link, X, Upload } from "lucide-react";
 import { PRIORITIES } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Location, MaintenanceGroup } from "@shared/schema";
+import { useUpload } from "@/hooks/use-upload";
 
 // Steps in the workflow
 type Step = "capture" | "processing" | "review" | "success";
@@ -45,6 +47,28 @@ export default function CreateTask() {
     priority: "Normal",
     locationId: "",
     assignedGroup: "",
+  });
+
+  // File upload and URL state
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      setAttachmentUrl(response.objectPath);
+      toast({
+        title: "File Uploaded",
+        description: "Your file has been attached to the task.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -331,6 +355,8 @@ export default function CreateTask() {
           priority: formData.priority,
           assignedGroup: formData.assignedGroup,
           imageUrl: photo,
+          attachmentUrl: attachmentUrl || undefined,
+          linkUrl: linkUrl.trim() || undefined,
           createdBy: user.id,
         };
 
@@ -599,6 +625,76 @@ export default function CreateTask() {
                     <img src={photo} className="w-full h-full object-cover" />
                   </div>
                 )}
+
+                {/* File Upload */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Attach File (Optional)</label>
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setAttachmentName(file.name);
+                        await uploadFile(file);
+                      }
+                    }}
+                  />
+                  {attachmentUrl ? (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <Paperclip className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 flex-1 truncate">{attachmentName}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-green-600 hover:text-red-500"
+                        onClick={() => {
+                          setAttachmentUrl(null);
+                          setAttachmentName(null);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-muted-foreground"
+                      onClick={() => attachmentInputRef.current?.click()}
+                      disabled={isUploading}
+                      data-testid="button-attach-file"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          Choose file to attach
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+
+                {/* URL Link */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Add Link (Optional)</label>
+                  <div className="relative">
+                    <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="url"
+                      placeholder="https://example.com"
+                      value={linkUrl}
+                      onChange={(e) => setLinkUrl(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-link-url"
+                    />
+                  </div>
+                </div>
 
                 <div className="pt-4 flex gap-3">
                   <Button 
