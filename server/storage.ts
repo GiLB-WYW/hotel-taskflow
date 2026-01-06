@@ -16,6 +16,8 @@ import {
   type InsertInvitation,
   type Notification,
   type InsertNotification,
+  type ActivityLog,
+  type InsertActivityLog,
   usersTable,
   categoriesTable,
   locationsTable,
@@ -24,6 +26,7 @@ import {
   notesTable,
   invitationsTable,
   notificationsTable,
+  activityLogTable,
   insertUserSchema,
   insertCategorySchema,
   insertLocationSchema,
@@ -32,6 +35,7 @@ import {
   insertNoteSchema,
   insertInvitationSchema,
   insertNotificationSchema,
+  insertActivityLogSchema,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { ZodError } from "zod";
@@ -110,6 +114,12 @@ export interface IStorage {
 
   // Task statistics
   getRedFlagTaskCountForUser(userId: string): Promise<number>;
+
+  // Activity Log
+  createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
+  updateActivityLog(id: string, updates: Partial<InsertActivityLog>): Promise<ActivityLog>;
+  deleteActivityLog(id: string): Promise<void>;
+  listActivityLogs(startDate?: Date, endDate?: Date): Promise<ActivityLog[]>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -459,6 +469,42 @@ export class PostgresStorage implements IStorage {
         sql`${tasksTable.status} != 'Resolved'`
       ));
     return Number(result[0]?.count || 0);
+  }
+
+  // Activity Log methods
+  async createActivityLog(data: InsertActivityLog): Promise<ActivityLog> {
+    const validated = insertActivityLogSchema.parse(data);
+    const entry = await db.insert(activityLogTable).values(validated).returning();
+    return entry[0];
+  }
+
+  async updateActivityLog(id: string, updates: Partial<InsertActivityLog>): Promise<ActivityLog> {
+    const entry = await db.update(activityLogTable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(activityLogTable.id, id))
+      .returning();
+    return entry[0];
+  }
+
+  async deleteActivityLog(id: string): Promise<void> {
+    await db.delete(activityLogTable).where(eq(activityLogTable.id, id));
+  }
+
+  async listActivityLogs(startDate?: Date, endDate?: Date): Promise<ActivityLog[]> {
+    let query = db.select().from(activityLogTable);
+    
+    if (startDate && endDate) {
+      query = query.where(and(
+        gte(activityLogTable.entryDate, startDate),
+        lte(activityLogTable.entryDate, endDate)
+      )) as typeof query;
+    } else if (startDate) {
+      query = query.where(gte(activityLogTable.entryDate, startDate)) as typeof query;
+    } else if (endDate) {
+      query = query.where(lte(activityLogTable.entryDate, endDate)) as typeof query;
+    }
+    
+    return await query.orderBy(desc(activityLogTable.entryDate));
   }
 }
 
