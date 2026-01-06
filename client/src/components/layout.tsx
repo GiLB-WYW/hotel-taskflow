@@ -8,7 +8,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  UserCog
+  UserCog,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +35,7 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/create-task", label: "New Task", icon: PlusCircle },
     { href: "/tasks", label: "All Tasks", icon: ClipboardList },
+    { href: "/activity-log", label: "Activity Log", icon: FileText },
     { href: "/admin", label: "Admin", icon: Settings, hide: userRole === "Basic Staff" || userRole === "Personnel" },
   ];
 
