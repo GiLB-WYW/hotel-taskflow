@@ -4,8 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthUser } from "@/lib/auth";
@@ -18,8 +16,8 @@ export default function ActivityLogPage() {
   const [newContent, setNewContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [useAI, setUseAI] = useState(false);
   const [isFormattingAI, setIsFormattingAI] = useState(false);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const authUser = getAuthUser();
@@ -125,14 +123,17 @@ export default function ActivityLogPage() {
 
   const sortedDates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a));
 
-  const handleSubmit = async () => {
+  const handlePreviewAI = async () => {
     if (!newContent.trim()) return;
-    
-    let finalContent = newContent.trim();
-    if (useAI) {
-      finalContent = await formatWithAI(finalContent);
-    }
+    const formatted = await formatWithAI(newContent.trim());
+    setAiPreview(formatted);
+  };
+
+  const handleSubmit = () => {
+    if (!newContent.trim() && !aiPreview) return;
+    const finalContent = aiPreview || newContent.trim();
     createMutation.mutate(finalContent);
+    setAiPreview(null);
   };
 
   const handleUpdate = (id: string) => {
@@ -201,32 +202,57 @@ export default function ActivityLogPage() {
               <Textarea
                 placeholder="What are you working on today? Share updates, progress, or notes for the team..."
                 value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
+                onChange={(e) => {
+                  setNewContent(e.target.value);
+                  setAiPreview(null);
+                }}
                 rows={4}
                 className="resize-none"
                 data-testid="input-entry-content"
               />
               
-              {/* AI Format Toggle */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-purple-600" />
-                  <div>
-                    <Label htmlFor="ai-toggle" className="text-sm font-medium cursor-pointer">
-                      Format with AI
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Convert to French bullet points
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  id="ai-toggle"
-                  checked={useAI}
-                  onCheckedChange={setUseAI}
-                  data-testid="switch-use-ai"
-                />
+              {/* AI Preview Button */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviewAI}
+                  disabled={!newContent.trim() || isFormattingAI}
+                  className="gap-2 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:border-purple-300 text-purple-700"
+                  data-testid="button-preview-ai"
+                >
+                  {isFormattingAI ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isFormattingAI ? "Formatting..." : "Preview AI (French)"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Convert to short French bullet points
+                </span>
               </div>
+
+              {/* AI Preview Result */}
+              {aiPreview && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-purple-700 flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      AI Preview
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-purple-600"
+                      onClick={() => setAiPreview(null)}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{aiPreview}</p>
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end">
                 <Button
@@ -234,7 +260,7 @@ export default function ActivityLogPage() {
                   onClick={() => {
                     setIsAddingEntry(false);
                     setNewContent("");
-                    setUseAI(false);
+                    setAiPreview(null);
                   }}
                   data-testid="button-cancel-entry"
                 >
@@ -243,17 +269,17 @@ export default function ActivityLogPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={!newContent.trim() || createMutation.isPending || isFormattingAI}
+                  disabled={(!newContent.trim() && !aiPreview) || createMutation.isPending}
                   data-testid="button-submit-entry"
                 >
-                  {(createMutation.isPending || isFormattingAI) ? (
+                  {createMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : useAI ? (
+                  ) : aiPreview ? (
                     <Sparkles className="h-4 w-4 mr-2" />
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
                   )}
-                  {isFormattingAI ? "Formatting..." : "Post Update"}
+                  {aiPreview ? "Post AI Version" : "Post Update"}
                 </Button>
               </div>
             </CardContent>
