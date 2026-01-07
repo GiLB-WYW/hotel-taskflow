@@ -209,8 +209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "User ID required" });
       }
 
-      if (!name || name.trim().length === 0) {
-        return res.status(400).json({ error: "Name is required" });
+      if ((!name || name.trim().length === 0) && (!email || email.trim().length === 0)) {
+        return res.status(400).json({ error: "Name or email is required" });
       }
 
       let user = await storage.getUser(userId);
@@ -218,14 +218,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If user doesn't exist (e.g., Google login), create them
       if (!user) {
         user = await storage.createUser({
-          name: name.trim(),
-          email: email || `${userId}@oauth.local`,
+          name: name?.trim() || "User",
+          email: email?.trim() || `${userId}@oauth.local`,
           role: "Admin",
           authProvider: provider || "google",
           authId: userId,
         });
       } else {
-        user = await storage.updateUser(userId, { name: name.trim() });
+        // Build update object with provided fields
+        const updates: { name?: string; email?: string } = {};
+        if (name) updates.name = name.trim();
+        if (email) updates.email = email.trim();
+        
+        user = await storage.updateUser(userId, updates);
       }
       
       // Don't send password hash to client

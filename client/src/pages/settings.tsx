@@ -15,6 +15,8 @@ export default function Settings() {
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(user?.name || "");
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [editEmail, setEditEmail] = useState(user?.email || "");
   
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -24,16 +26,21 @@ export default function Settings() {
     if (user?.name) {
       setEditName(user.name);
     }
-  }, [user?.name]);
+    if (user?.email) {
+      setEditEmail(user.email);
+    }
+  }, [user?.name, user?.email]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async ({ name, email }: { name?: string; email?: string }) => {
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user?.id,
-          name,
+          name: name || user?.name,
+          email: email || user?.email,
+          provider: user?.provider,
         }),
         credentials: "include",
       });
@@ -44,12 +51,14 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: (updatedUser) => {
-      // Update local storage with new user data
-      setAuthUser(updatedUser);
+      // Update local storage with new user data - preserve provider and other local fields
+      const currentUser = getAuthUser();
+      setAuthUser({ ...currentUser, ...updatedUser });
       setIsEditingName(false);
+      setIsEditingEmail(false);
       toast({
         title: "Profile Updated",
-        description: "Your name has been updated successfully.",
+        description: "Your profile has been updated successfully.",
       });
       // Force page refresh to update sidebar
       window.location.reload();
@@ -155,7 +164,7 @@ export default function Settings() {
                         variant="ghost"
                         onClick={() => {
                           if (editName.trim()) {
-                            updateProfileMutation.mutate(editName);
+                            updateProfileMutation.mutate({ name: editName });
                           }
                         }}
                         disabled={updateProfileMutation.isPending || !editName.trim()}
@@ -201,7 +210,60 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground text-sm">Email</Label>
-                  <p className="font-medium" data-testid="text-settings-email">{user?.email || "N/A"}</p>
+                  {isEditingEmail ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        className="h-8"
+                        data-testid="input-edit-email"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (editEmail.trim()) {
+                            updateProfileMutation.mutate({ email: editEmail });
+                          }
+                        }}
+                        disabled={updateProfileMutation.isPending || !editEmail.trim()}
+                        data-testid="button-save-email"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditEmail(user?.email || "");
+                          setIsEditingEmail(false);
+                        }}
+                        disabled={updateProfileMutation.isPending}
+                        data-testid="button-cancel-edit-email"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium" data-testid="text-settings-email">{user?.email || "N/A"}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingEmail(true)}
+                        className="h-6 w-6 p-0"
+                        data-testid="button-edit-email"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-muted-foreground text-sm">Group</Label>
