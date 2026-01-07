@@ -215,15 +215,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user = await storage.getUser(userId);
       
-      // If user doesn't exist (e.g., Google login), create them
+      // If user doesn't exist (e.g., Google login), check if email exists
       if (!user) {
-        user = await storage.createUser({
-          name: name?.trim() || "User",
-          email: email?.trim() || `${userId}@oauth.local`,
-          role: "Admin",
-          authProvider: provider || "google",
-          authId: userId,
-        });
+        // Check if a user with this email already exists
+        if (email) {
+          const existingUserByEmail = await storage.getUserByEmail(email.trim());
+          if (existingUserByEmail) {
+            // Link Google account to existing user - return existing user
+            user = existingUserByEmail;
+          }
+        }
+        
+        // If still no user found, create new one
+        if (!user) {
+          user = await storage.createUser({
+            name: name?.trim() || "User",
+            email: email?.trim() || `${userId}@oauth.local`,
+            role: "Admin",
+            authProvider: provider || "google",
+            authId: userId,
+          });
+        }
       } else {
         // Build update object with provided fields
         const updates: { name?: string; email?: string } = {};
