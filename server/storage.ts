@@ -120,6 +120,9 @@ export interface IStorage {
   updateActivityLog(id: string, updates: Partial<InsertActivityLog>): Promise<ActivityLog>;
   deleteActivityLog(id: string): Promise<void>;
   listActivityLogs(startDate?: Date, endDate?: Date): Promise<ActivityLog[]>;
+
+  // Get tasks resolved on a specific date
+  getResolvedTasksForDate(date: Date): Promise<Task[]>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -505,6 +508,21 @@ export class PostgresStorage implements IStorage {
     }
     
     return await query.orderBy(desc(activityLogTable.entryDate));
+  }
+
+  async getResolvedTasksForDate(date: Date): Promise<Task[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await db.select().from(tasksTable)
+      .where(and(
+        eq(tasksTable.status, "Resolved"),
+        gte(tasksTable.updatedAt, startOfDay),
+        lte(tasksTable.updatedAt, endOfDay)
+      ))
+      .orderBy(desc(tasksTable.updatedAt));
   }
 }
 

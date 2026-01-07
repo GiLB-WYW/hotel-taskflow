@@ -1086,6 +1086,112 @@ ${content}`;
     }
   });
 
+  // Generate daily resolved tasks summary for Activity Log
+  app.post("/api/activity-log/generate-daily-summary", async (req, res) => {
+    try {
+      const targetDate = req.body.date ? new Date(req.body.date) : new Date();
+      
+      // Get all resolved tasks for that day
+      const resolvedTasks = await storage.getResolvedTasksForDate(targetDate);
+      
+      if (resolvedTasks.length === 0) {
+        return res.json({ message: "No resolved tasks for this date", tasksCount: 0 });
+      }
+
+      // Get locations to map IDs to names
+      const locations = await storage.listLocations();
+      const locationMap = new Map(locations.map(l => [l.id, l.name]));
+
+      // Format the summary as a list of title + location
+      const summaryLines = resolvedTasks.map(task => {
+        const locationName = locationMap.get(task.locationId) || task.locationId;
+        return `• ${task.title} - ${locationName}`;
+      });
+
+      const dateStr = targetDate.toLocaleDateString("fr-FR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+
+      const content = `📋 Tâches résolues le ${dateStr}:\n\n${summaryLines.join("\n")}`;
+
+      // Create the activity log entry
+      const entry = await storage.createActivityLog({
+        content,
+        authorId: "system",
+        authorName: "Système Automatique",
+        entryDate: targetDate,
+      });
+
+      res.json({ 
+        message: "Daily summary created", 
+        tasksCount: resolvedTasks.length,
+        entry 
+      });
+    } catch (error) {
+      console.error("Failed to generate daily summary:", error);
+      res.status(500).json({ error: "Failed to generate daily summary" });
+    }
+  });
+
+  // Start the daily summary scheduler (runs every hour, checks if it's after 23:00)
+  let lastSummaryDate: string | null = null;
+  
+  const checkAndGenerateDailySummary = async () => {
+    const now = new Date();
+    const hour = now.getHours();
+    const todayStr = now.toISOString().split("T")[0];
+    
+    // Run after 23:00 and only once per day
+    if (hour >= 23 && lastSummaryDate !== todayStr) {
+      console.log(`[Daily Summary] Generating summary for ${todayStr}...`);
+      try {
+        const resolvedTasks = await storage.getResolvedTasksForDate(now);
+        
+        if (resolvedTasks.length > 0) {
+          const locations = await storage.listLocations();
+          const locationMap = new Map(locations.map(l => [l.id, l.name]));
+
+          const summaryLines = resolvedTasks.map(task => {
+            const locationName = locationMap.get(task.locationId) || task.locationId;
+            return `• ${task.title} - ${locationName}`;
+          });
+
+          const dateStr = now.toLocaleDateString("fr-FR", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+          });
+
+          const content = `📋 Tâches résolues le ${dateStr}:\n\n${summaryLines.join("\n")}`;
+
+          await storage.createActivityLog({
+            content,
+            authorId: "system",
+            authorName: "Système Automatique",
+            entryDate: now,
+          });
+
+          console.log(`[Daily Summary] Created summary with ${resolvedTasks.length} tasks`);
+        } else {
+          console.log(`[Daily Summary] No resolved tasks for ${todayStr}`);
+        }
+        
+        lastSummaryDate = todayStr;
+      } catch (error) {
+        console.error("[Daily Summary] Error:", error);
+      }
+    }
+  };
+
+  // Check every 30 minutes
+  setInterval(checkAndGenerateDailySummary, 30 * 60 * 1000);
+  // Also check on startup
+  setTimeout(checkAndGenerateDailySummary, 5000);
+
   const httpServer = createServer(app);
 
   return httpServer;
