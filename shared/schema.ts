@@ -151,7 +151,9 @@ export const insertNotificationSchema = createInsertSchema(notificationsTable).o
   createdAt: true,
 });
 
-export const insertActivityLogSchema = createInsertSchema(activityLogTable).omit({
+export const insertActivityLogSchema = createInsertSchema(activityLogTable, {
+  entryDate: z.union([z.date(), z.string().transform(s => new Date(s))]),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

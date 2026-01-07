@@ -130,13 +130,8 @@ export default function ActivityLogPage() {
   };
 
   const handleSubmit = () => {
-    console.log("handleSubmit called", { newContent, aiPreview, authUser });
-    if (!newContent.trim() && !aiPreview) {
-      console.log("Submit blocked - no content");
-      return;
-    }
+    if (!newContent.trim() && !aiPreview) return;
     const finalContent = aiPreview || newContent.trim();
-    console.log("Submitting content:", finalContent);
     createMutation.mutate(finalContent);
     setAiPreview(null);
   };
