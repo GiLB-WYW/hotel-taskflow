@@ -1039,6 +1039,52 @@ Respond ONLY with valid JSON in this exact format:
     }
   });
 
+  // AI format activity log content to French bullet points
+  app.post("/api/ai/format-activity", async (req, res) => {
+    try {
+      const { content } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      // Import OpenAI using the Replit AI Integrations credentials
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      });
+
+      const prompt = `Convert the following text into short, professional French bullet points for a work activity log. 
+Keep it concise and action-oriented. Use proper French.
+Only output the bullet points, nothing else.
+
+Text to convert:
+${content}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a professional assistant that formats work activity logs into concise French bullet points. Keep each point short and action-focused."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 300,
+      });
+
+      const formatted = completion.choices[0]?.message?.content || content;
+      res.json({ formatted });
+    } catch (error) {
+      console.error("AI format error:", error);
+      res.status(500).json({ error: "Failed to format with AI" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

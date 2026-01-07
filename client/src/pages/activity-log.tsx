@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthUser } from "@/lib/auth";
 import { format, startOfDay, isSameDay } from "date-fns";
-import { Plus, FileText, Calendar, Edit2, Trash2, Save, X, Loader2 } from "lucide-react";
+import { Plus, FileText, Calendar, Edit2, Trash2, Save, X, Loader2, Sparkles } from "lucide-react";
 import type { ActivityLog } from "@shared/schema";
 
 export default function ActivityLogPage() {
@@ -16,9 +18,34 @@ export default function ActivityLogPage() {
   const [newContent, setNewContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [useAI, setUseAI] = useState(false);
+  const [isFormattingAI, setIsFormattingAI] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const authUser = getAuthUser();
+
+  const formatWithAI = async (text: string): Promise<string> => {
+    setIsFormattingAI(true);
+    try {
+      const response = await fetch("/api/ai/format-activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+      if (!response.ok) throw new Error("AI formatting failed");
+      const data = await response.json();
+      return data.formatted;
+    } catch (error) {
+      toast({
+        title: "AI Error",
+        description: "Could not format with AI. Posting original text.",
+        variant: "destructive",
+      });
+      return text;
+    } finally {
+      setIsFormattingAI(false);
+    }
+  };
 
   const { data: entries = [], isLoading } = useQuery<ActivityLog[]>({
     queryKey: ["/api/activity-log"],
@@ -98,9 +125,14 @@ export default function ActivityLogPage() {
 
   const sortedDates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!newContent.trim()) return;
-    createMutation.mutate(newContent.trim());
+    
+    let finalContent = newContent.trim();
+    if (useAI) {
+      finalContent = await formatWithAI(finalContent);
+    }
+    createMutation.mutate(finalContent);
   };
 
   const handleUpdate = (id: string) => {
@@ -174,12 +206,35 @@ export default function ActivityLogPage() {
                 className="resize-none"
                 data-testid="input-entry-content"
               />
+              
+              {/* AI Format Toggle */}
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                  <div>
+                    <Label htmlFor="ai-toggle" className="text-sm font-medium cursor-pointer">
+                      Format with AI
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Convert to French bullet points
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="ai-toggle"
+                  checked={useAI}
+                  onCheckedChange={setUseAI}
+                  data-testid="switch-use-ai"
+                />
+              </div>
+
               <div className="flex gap-2 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setIsAddingEntry(false);
                     setNewContent("");
+                    setUseAI(false);
                   }}
                   data-testid="button-cancel-entry"
                 >
@@ -188,15 +243,17 @@ export default function ActivityLogPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={!newContent.trim() || createMutation.isPending}
+                  disabled={!newContent.trim() || createMutation.isPending || isFormattingAI}
                   data-testid="button-submit-entry"
                 >
-                  {createMutation.isPending ? (
+                  {(createMutation.isPending || isFormattingAI) ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : useAI ? (
+                    <Sparkles className="h-4 w-4 mr-2" />
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
                   )}
-                  Post Update
+                  {isFormattingAI ? "Formatting..." : "Post Update"}
                 </Button>
               </div>
             </CardContent>
