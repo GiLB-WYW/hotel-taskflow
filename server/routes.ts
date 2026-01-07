@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update user profile (for logged-in user to update their own info)
   app.patch("/api/profile", async (req, res) => {
     try {
-      const { userId, name } = req.body;
+      const { userId, name, email, provider } = req.body;
       
       if (!userId) {
         return res.status(400).json({ error: "User ID required" });
@@ -213,17 +213,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Name is required" });
       }
 
-      const user = await storage.getUser(userId);
+      let user = await storage.getUser(userId);
+      
+      // If user doesn't exist (e.g., Google login), create them
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        user = await storage.createUser({
+          name: name.trim(),
+          email: email || `${userId}@oauth.local`,
+          role: "Admin",
+          authProvider: provider || "google",
+          authId: userId,
+        });
+      } else {
+        user = await storage.updateUser(userId, { name: name.trim() });
       }
-
-      const updatedUser = await storage.updateUser(userId, { name: name.trim() });
       
       // Don't send password hash to client
-      const { password: _, ...userWithoutPassword } = updatedUser;
+      const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error) {
+      console.error("Profile update error:", error);
       res.status(500).json({ error: "Failed to update profile" });
     }
   });
