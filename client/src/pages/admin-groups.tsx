@@ -256,7 +256,7 @@ export default function AdminGroups() {
                   </thead>
                   <tbody>
                     {groups.map((group) => {
-                      const groupMemberCount = users.filter(u => u.group === group.id).length;
+                      const groupMemberCount = users.filter(u => u.groups?.includes(group.id)).length;
                       return (
                       <tr key={group.id} className="border-b hover:bg-muted/50" data-testid={`row-group-${group.id}`}>
                         <td className="py-3 px-4 font-medium">{group.name}</td>
