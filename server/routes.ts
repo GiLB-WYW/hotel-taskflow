@@ -822,7 +822,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/maintenance-groups", async (req, res) => {
     try {
       const groups = await storage.listMaintenanceGroups();
-      res.json(groups);
+      const users = await storage.listUsers();
+      
+      // Calculate member count dynamically from users' groups array
+      const groupsWithCounts = groups.map(group => {
+        const memberCount = users.filter(u => u.groups?.includes(group.id)).length;
+        return { ...group, memberCount };
+      });
+      
+      res.json(groupsWithCounts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch maintenance groups" });
     }
