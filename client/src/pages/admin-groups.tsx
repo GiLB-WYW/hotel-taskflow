@@ -25,6 +25,7 @@ interface User {
   email: string;
   role: string;
   group: string | null;
+  groups: string[] | null;
 }
 
 export default function AdminGroups() {
@@ -91,11 +92,22 @@ export default function AdminGroups() {
   });
 
   const updateUserGroupMutation = useMutation({
-    mutationFn: async ({ userId, groupId }: { userId: string; groupId: string | null }) => {
+    mutationFn: async ({ userId, groupId, action }: { userId: string; groupId: string; action: "add" | "remove" }) => {
+      // Get current user to preserve existing groups
+      const user = users.find(u => u.id === userId);
+      const currentGroups = user?.groups || [];
+      
+      let newGroups: string[];
+      if (action === "add") {
+        newGroups = currentGroups.includes(groupId) ? currentGroups : [...currentGroups, groupId];
+      } else {
+        newGroups = currentGroups.filter(g => g !== groupId);
+      }
+      
       const response = await fetch(`/api/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ group: groupId }),
+        body: JSON.stringify({ groups: newGroups }),
       });
       if (!response.ok) throw new Error("Failed to update user");
       return response.json();
@@ -149,8 +161,8 @@ export default function AdminGroups() {
       // Update group name and description
       await updateMutation.mutateAsync({ id: editingGroup.id, data: { name: formData.name, description: formData.description || null } });
 
-      // Get users that were in this group before
-      const previousGroupMembers = users.filter(u => u.group === editingGroup.id);
+      // Get users that were in this group before (using groups array)
+      const previousGroupMembers = users.filter(u => u.groups?.includes(editingGroup.id));
       const previousMemberIds = previousGroupMembers.map(u => u.id);
 
       // Users to add (in selectedUserIds but not in previous)
@@ -161,8 +173,8 @@ export default function AdminGroups() {
 
       // Update user group assignments
       const updatePromises = [
-        ...usersToAdd.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: editingGroup.id })),
-        ...usersToRemove.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: null })),
+        ...usersToAdd.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: editingGroup.id, action: "add" })),
+        ...usersToRemove.map(userId => updateUserGroupMutation.mutateAsync({ userId, groupId: editingGroup.id, action: "remove" })),
       ];
 
       await Promise.all(updatePromises);
@@ -184,8 +196,8 @@ export default function AdminGroups() {
     setEditingGroup(group);
     setFormData({ name: group.name, description: group.description || "", members: group.memberCount });
     
-    // Pre-select users that belong to this group
-    const groupMembers = users.filter(u => u.group === group.id).map(u => u.id);
+    // Pre-select users that belong to this group (using groups array)
+    const groupMembers = users.filter(u => u.groups?.includes(group.id)).map(u => u.id);
     setSelectedUserIds(groupMembers);
     
     setIsEditDialogOpen(true);
@@ -200,7 +212,7 @@ export default function AdminGroups() {
   };
 
   const openAddDialog = () => {
-    setFormData({ name: "", members: 0 });
+    setFormData({ name: "", description: "", members: 0 });
     setIsAddDialogOpen(true);
   };
 

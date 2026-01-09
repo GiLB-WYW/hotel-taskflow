@@ -142,13 +142,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/users/:id", async (req, res) => {
     try {
-      const { name, email, role, password, groups } = req.body;
+      const { name, email, role, password, groups, group } = req.body;
       const updates: any = {};
       
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
       if (role !== undefined) updates.role = role;
       if (groups !== undefined) updates.groups = groups;
+      // Handle single group assignment (legacy support)
+      if (group !== undefined) updates.group = group;
       
       const user = await storage.updateUser(req.params.id, updates);
       
@@ -158,6 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(user);
     } catch (error) {
+      console.error("Failed to update user:", error);
       res.status(500).json({ error: "Failed to update user" });
     }
   });
