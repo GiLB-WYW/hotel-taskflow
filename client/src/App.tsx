@@ -55,6 +55,25 @@ function App() {
   useEffect(() => {
     // Check if user is already logged in
     const user = getAuthUser();
+    
+    // Auto-clear fake OAuth sessions created by the old placeholder OAuth implementation
+    // Fake sessions have IDs like "google_abc123" or "microsoft_xyz789" with random suffixes
+    if (user && user.id) {
+      const isFakeSession = 
+        (user.id.startsWith("google_") && !user.id.includes("-")) ||
+        (user.id.startsWith("microsoft_") && !user.id.includes("-")) ||
+        (user.provider === "google" && user.name === "Google User") ||
+        (user.provider === "microsoft" && user.name === "Microsoft User");
+      
+      if (isFakeSession) {
+        console.log("Clearing invalid OAuth session:", user.id);
+        localStorage.removeItem("user");
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+    }
+    
     setIsAuthenticated(!!user);
     setIsLoading(false);
   }, []);
