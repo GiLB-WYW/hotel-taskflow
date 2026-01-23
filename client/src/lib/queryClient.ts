@@ -31,6 +31,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      cache: "no-store", // Prevent browser caching, always fetch fresh data
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -46,9 +47,9 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 30000, // 30 seconds - allows data to refresh periodically
+      retry: 1,
     },
     mutations: {
       retry: false,
