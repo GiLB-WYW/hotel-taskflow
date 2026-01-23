@@ -74,6 +74,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email-only login for users without passwords (Google/Microsoft button)
+  app.post("/api/auth/email-login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email required" });
+      }
+
+      const user = await storage.getUserByEmail(email.trim().toLowerCase());
+      
+      if (!user) {
+        return res.status(401).json({ error: "No account found with this email. Please contact your administrator." });
+      }
+
+      // Don't send password hash to client
+      const { password: _, ...userWithoutPassword } = user;
+      console.log("Email login successful for:", email);
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Email login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
   app.post("/api/auth/oauth", async (req, res) => {
     try {
       const { authProvider, authId, name, email } = req.body;

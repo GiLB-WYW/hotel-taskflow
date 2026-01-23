@@ -107,18 +107,140 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Google login is coming soon. Please use email and password to sign in.",
-    });
+  const handleGoogleLogin = async () => {
+    const googleEmail = prompt("Enter your registered email address:");
+    
+    if (!googleEmail || !googleEmail.trim()) {
+      return;
+    }
+    
+    if (!googleEmail.includes("@")) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch("/api/auth/email-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: googleEmail.trim().toLowerCase() }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Login Failed",
+          description: data.error || "No account found with this email.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        group: data.group,
+        groups: data.groups,
+        provider: "google",
+        avatar: data.name?.[0]?.toUpperCase() || "G",
+      }));
+      
+      toast({
+        title: "Login Successful",
+        description: `Welcome, ${data.name}!`,
+      });
+      
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Google login error:", error);
+      toast({
+        title: "Login Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
-  const handleMicrosoftLogin = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Microsoft login is coming soon. Please use email and password to sign in.",
-    });
+  const handleMicrosoftLogin = async () => {
+    const microsoftEmail = prompt("Enter your registered email address:");
+    
+    if (!microsoftEmail || !microsoftEmail.trim()) {
+      return;
+    }
+    
+    if (!microsoftEmail.includes("@")) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch("/api/auth/email-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: microsoftEmail.trim().toLowerCase() }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Login Failed",
+          description: data.error || "No account found with this email.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        group: data.group,
+        groups: data.groups,
+        provider: "microsoft",
+        avatar: data.name?.[0]?.toUpperCase() || "M",
+      }));
+      
+      toast({
+        title: "Login Successful",
+        description: `Welcome, ${data.name}!`,
+      });
+      
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Microsoft login error:", error);
+      toast({
+        title: "Login Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
