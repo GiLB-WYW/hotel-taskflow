@@ -107,52 +107,132 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    const googleEmail = prompt("Enter your Google email address:");
+    
+    if (!googleEmail || !googleEmail.includes("@")) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate Google OAuth
-    setTimeout(() => {
-      const user = {
-        id: "google_" + Math.random().toString(36).substr(2, 9),
-        email: "user@gmail.com",
-        name: "Google User",
-        provider: "google",
-        avatar: "G",
-      };
+    try {
+      const response = await fetch("/api/auth/google-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: googleEmail.trim().toLowerCase() }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Login Failed",
+          description: data.error || "No account found with this email. Please contact your administrator.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
       
-      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        group: data.group,
+        groups: data.groups,
+        provider: "google",
+        avatar: data.name?.[0]?.toUpperCase() || "G",
+      }));
       
       toast({
         title: "Login Successful",
-        description: "Welcome! You've been logged in with Google.",
+        description: `Welcome, ${data.name}!`,
       });
       
-      window.location.href = "/";
-    }, 800);
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Google login error:", error);
+      toast({
+        title: "Login Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
-  const handleMicrosoftLogin = () => {
+  const handleMicrosoftLogin = async () => {
+    const microsoftEmail = prompt("Enter your Microsoft email address:");
+    
+    if (!microsoftEmail || !microsoftEmail.includes("@")) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate Microsoft OAuth
-    setTimeout(() => {
-      const user = {
-        id: "microsoft_" + Math.random().toString(36).substr(2, 9),
-        email: "user@outlook.com",
-        name: "Microsoft User",
-        provider: "microsoft",
-        avatar: "M",
-      };
+    try {
+      const response = await fetch("/api/auth/google-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: microsoftEmail.trim().toLowerCase() }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Login Failed",
+          description: data.error || "No account found with this email. Please contact your administrator.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
       
-      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        group: data.group,
+        groups: data.groups,
+        provider: "microsoft",
+        avatar: data.name?.[0]?.toUpperCase() || "M",
+      }));
       
       toast({
         title: "Login Successful",
-        description: "Welcome! You've been logged in with Microsoft.",
+        description: `Welcome, ${data.name}!`,
       });
       
-      window.location.href = "/";
-    }, 800);
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Microsoft login error:", error);
+      toast({
+        title: "Login Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
