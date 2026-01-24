@@ -56,45 +56,60 @@ function App() {
     // Check if user is already logged in
     const user = getAuthUser();
     
-    // Auto-clear fake OAuth sessions created by the old placeholder OAuth implementation
+    // Quick check for obviously fake OAuth sessions
     if (user && user.id) {
-      const isFakeSession = 
-        // IDs like "google_abc123" or "microsoft_xyz789" without UUID format
-        (user.id.startsWith("google_") && !user.id.includes("-")) ||
-        (user.id.startsWith("microsoft_") && !user.id.includes("-")) ||
-        // Generic placeholder names from fake OAuth
+      const isClearlyFakeSession = 
+        // Generic placeholder names from old fake OAuth
         user.name === "Google User" ||
         user.name === "Microsoft User" ||
-        // Provider set but no valid database ID (UUIDs have hyphens)
-        ((user.provider === "google" || user.provider === "microsoft") && 
-         typeof user.id === "string" && !user.id.includes("-"));
+        // IDs like "google_abc123" without UUID format
+        (user.id.startsWith("google_") && !user.id.includes("-")) ||
+        (user.id.startsWith("microsoft_") && !user.id.includes("-"));
       
-      if (isFakeSession) {
-        console.log("Clearing invalid OAuth session:", user.id, user.name);
+      if (isClearlyFakeSession) {
+        console.log("Clearing fake OAuth session:", user.id, user.name);
         localStorage.removeItem("user");
         setIsAuthenticated(false);
         setIsLoading(false);
         return;
       }
       
-      // Validate session against database for existing users
-      fetch(`/api/users/${user.id}`, { 
+      // Validate session against database using secure endpoint
+      // Requires both userId AND email to match - prevents ID spoofing
+      fetch("/api/auth/validate-session", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
         credentials: "include",
         cache: "no-store"
       })
-        .then(res => {
-          if (!res.ok) {
-            console.log("User not found in database, clearing session:", user.id);
+        .then(res => res.json())
+        .then(data => {
+          if (!data.valid) {
+            console.log("Session invalid:", data.error);
             localStorage.removeItem("user");
             setIsAuthenticated(false);
           } else {
+            // Update local storage with fresh user data from database
+            localStorage.setItem("user", JSON.stringify({
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              role: data.user.role,
+              group: data.user.group,
+              groups: data.user.groups,
+              provider: data.user.authProvider || user.provider || "email",
+              avatar: data.user.avatar || data.user.email[0].toUpperCase(),
+            }));
             setIsAuthenticated(true);
           }
           setIsLoading(false);
         })
         .catch(() => {
-          // Network error - allow offline usage with cached session
-          setIsAuthenticated(true);
+          // Network error - force re-login for security (no offline trust)
+          console.log("Session validation failed - network error");
+          localStorage.removeItem("user");
+          setIsAuthenticated(false);
           setIsLoading(false);
         });
       return;

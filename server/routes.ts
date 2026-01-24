@@ -74,6 +74,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Session validation endpoint - verifies if stored session corresponds to real user
+  app.post("/api/auth/validate-session", async (req, res) => {
+    try {
+      const { userId, email } = req.body;
+      
+      if (!userId || !email) {
+        return res.status(400).json({ valid: false, error: "Missing credentials" });
+      }
+
+      // Validate that both userId and email match a real user
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.json({ valid: false, error: "User not found" });
+      }
+
+      // Verify email matches to prevent ID spoofing
+      if (user.email.toLowerCase() !== email.toLowerCase()) {
+        return res.json({ valid: false, error: "Session mismatch" });
+      }
+
+      // Return fresh user data (without password)
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ valid: true, user: userWithoutPassword });
+    } catch (error) {
+      console.error("Session validation error:", error);
+      res.json({ valid: false, error: "Validation failed" });
+    }
+  });
+
   // Email-only login for users without passwords (Google/Microsoft button)
   app.post("/api/auth/email-login", async (req, res) => {
     try {
