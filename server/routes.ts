@@ -10,6 +10,35 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
+  
+  // Debug endpoint to check database connection and data in production
+  app.get("/api/debug/status", async (req, res) => {
+    try {
+      const tasks = await storage.listTasks({});
+      const users = await storage.listUsers();
+      const locations = await storage.listLocations();
+      
+      res.json({
+        status: "connected",
+        environment: process.env.NODE_ENV || "unknown",
+        timestamp: new Date().toISOString(),
+        counts: {
+          tasks: tasks.length,
+          users: users.length,
+          locations: locations.length
+        },
+        databaseUrl: process.env.DATABASE_URL ? "configured" : "missing"
+      });
+    } catch (error) {
+      console.error("Debug status error:", error);
+      res.status(500).json({
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+        databaseUrl: process.env.DATABASE_URL ? "configured" : "missing"
+      });
+    }
+  });
+
   // Authentication routes
   app.post("/api/auth/register", async (req, res) => {
     try {
