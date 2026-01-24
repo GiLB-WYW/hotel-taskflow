@@ -695,9 +695,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (startDate) filters.startDate = new Date(startDate as string);
       if (endDate) filters.endDate = new Date(endDate as string);
 
+      console.log("Fetching tasks with filters:", filters);
       const tasks = await storage.listTasks(filters);
+      console.log("Tasks fetched:", tasks.length);
       res.json(tasks);
     } catch (error) {
+      console.error("Error fetching tasks:", error);
       res.status(500).json({ error: "Failed to fetch tasks" });
     }
   });
