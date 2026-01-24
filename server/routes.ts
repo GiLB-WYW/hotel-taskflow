@@ -11,6 +11,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
   
+  // Debug endpoint to test task serialization
+  app.get("/api/debug/tasks-sample", async (req, res) => {
+    try {
+      const allTasks = await storage.listTasks({});
+      // Return just first 3 tasks for testing
+      const sample = allTasks.slice(0, 3);
+      console.log("Sample tasks:", sample.length);
+      res.json({
+        totalCount: allTasks.length,
+        sampleCount: sample.length,
+        sample: sample
+      });
+    } catch (error) {
+      console.error("Debug tasks-sample error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Debug endpoint to check database connection and data in production
   app.get("/api/debug/status", async (req, res) => {
     try {
@@ -728,9 +748,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tasks = await storage.listTasks(filters);
       console.log("Tasks fetched:", tasks.length);
       
+      // Explicitly serialize to catch any JSON serialization errors
+      let jsonString: string;
+      try {
+        jsonString = JSON.stringify(tasks);
+      } catch (serializeError) {
+        console.error("JSON serialization error:", serializeError);
+        return res.status(500).json({ 
+          error: "Failed to serialize tasks",
+          details: serializeError instanceof Error ? serializeError.message : "Unknown serialization error"
+        });
+      }
+      
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
-      res.json(tasks);
+      res.setHeader('Content-Type', 'application/json');
+      res.send(jsonString);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
