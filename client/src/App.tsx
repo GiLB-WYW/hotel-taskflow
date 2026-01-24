@@ -57,21 +57,47 @@ function App() {
     const user = getAuthUser();
     
     // Auto-clear fake OAuth sessions created by the old placeholder OAuth implementation
-    // Fake sessions have IDs like "google_abc123" or "microsoft_xyz789" with random suffixes
     if (user && user.id) {
       const isFakeSession = 
+        // IDs like "google_abc123" or "microsoft_xyz789" without UUID format
         (user.id.startsWith("google_") && !user.id.includes("-")) ||
         (user.id.startsWith("microsoft_") && !user.id.includes("-")) ||
-        (user.provider === "google" && user.name === "Google User") ||
-        (user.provider === "microsoft" && user.name === "Microsoft User");
+        // Generic placeholder names from fake OAuth
+        user.name === "Google User" ||
+        user.name === "Microsoft User" ||
+        // Provider set but no valid database ID (UUIDs have hyphens)
+        ((user.provider === "google" || user.provider === "microsoft") && 
+         typeof user.id === "string" && !user.id.includes("-"));
       
       if (isFakeSession) {
-        console.log("Clearing invalid OAuth session:", user.id);
+        console.log("Clearing invalid OAuth session:", user.id, user.name);
         localStorage.removeItem("user");
         setIsAuthenticated(false);
         setIsLoading(false);
         return;
       }
+      
+      // Validate session against database for existing users
+      fetch(`/api/users/${user.id}`, { 
+        credentials: "include",
+        cache: "no-store"
+      })
+        .then(res => {
+          if (!res.ok) {
+            console.log("User not found in database, clearing session:", user.id);
+            localStorage.removeItem("user");
+            setIsAuthenticated(false);
+          } else {
+            setIsAuthenticated(true);
+          }
+          setIsLoading(false);
+        })
+        .catch(() => {
+          // Network error - allow offline usage with cached session
+          setIsAuthenticated(true);
+          setIsLoading(false);
+        });
+      return;
     }
     
     setIsAuthenticated(!!user);
