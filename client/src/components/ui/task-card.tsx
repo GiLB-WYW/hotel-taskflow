@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MapPin, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { MapPin, Clock, AlertTriangle, CheckCircle, Image } from "lucide-react";
 import { Task, PRIORITIES } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -65,9 +65,14 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
             {task.title}
           </h3>
         </div>
-        {task.imageUrl && (
+        {task.imageUrl && task.imageUrl !== 'HAS_IMAGE' && (
           <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border">
             <img src={task.imageUrl} alt="Task" className="h-full w-full object-cover" />
+          </div>
+        )}
+        {(task as any).hasImage && (
+          <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border bg-muted flex items-center justify-center">
+            <Image className="h-6 w-6 text-muted-foreground" />
           </div>
         )}
       </CardHeader>

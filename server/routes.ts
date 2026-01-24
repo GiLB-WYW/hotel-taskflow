@@ -748,22 +748,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tasks = await storage.listTasks(filters);
       console.log("Tasks fetched:", tasks.length);
       
-      // Explicitly serialize to catch any JSON serialization errors
-      let jsonString: string;
-      try {
-        jsonString = JSON.stringify(tasks);
-      } catch (serializeError) {
-        console.error("JSON serialization error:", serializeError);
-        return res.status(500).json({ 
-          error: "Failed to serialize tasks",
-          details: serializeError instanceof Error ? serializeError.message : "Unknown serialization error"
-        });
-      }
+      // Optimize response by replacing base64 images with thumbnails/placeholders
+      // Full images can be fetched via individual task endpoints
+      const optimizedTasks = tasks.map(task => {
+        if (task.imageUrl && task.imageUrl.startsWith('data:image')) {
+          // Replace full base64 with a flag indicating image exists
+          return {
+            ...task,
+            imageUrl: 'HAS_IMAGE', // Flag to indicate image exists
+            hasImage: true
+          };
+        }
+        return task;
+      });
       
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Content-Type', 'application/json');
-      res.send(jsonString);
+      res.json(optimizedTasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
