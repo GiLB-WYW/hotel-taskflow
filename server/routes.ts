@@ -727,10 +727,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching tasks with filters:", filters);
       const tasks = await storage.listTasks(filters);
       console.log("Tasks fetched:", tasks.length);
+      
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
       res.json(tasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
-      res.status(500).json({ error: "Failed to fetch tasks" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Error details:", { message: errorMessage, stack: errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch tasks",
+        details: errorMessage,
+        environment: process.env.NODE_ENV
+      });
     }
   });
 
