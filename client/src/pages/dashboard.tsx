@@ -5,7 +5,7 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [locationSearchOpen, setLocationSearchOpen] = useState(false);
   const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
   const [groupFilter, setGroupFilter] = useState("All");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
@@ -431,14 +432,37 @@ export default function Dashboard() {
 
         {/* Task Grid */}
         <div>
-          <h3 className="text-lg font-serif font-semibold mb-4 flex items-center gap-2">
-            Tasks
-            <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-xs">
-              {sortedTasks.length}
-            </Badge>
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-serif font-semibold flex items-center gap-2">
+              Tasks
+              <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-xs">
+                {sortedTasks.length}
+              </Badge>
+            </h3>
+            <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/50">
+              <Button
+                variant={viewMode === "cards" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("cards")}
+                title="Card view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("list")}
+                title="List view"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           
           {sortedTasks.length > 0 ? (
+            viewMode === "cards" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {sortedTasks.map(task => {
                 // Build filter query string to preserve context when navigating to task
@@ -463,6 +487,74 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            ) : (
+            <div className="space-y-2">
+              {sortedTasks.map(task => {
+                const filterParams = new URLSearchParams();
+                if (statusFilter !== "All") filterParams.set("status", statusFilter);
+                if (priorityFilter !== "All") filterParams.set("priority", priorityFilter);
+                if (locationCategoryFilter !== "All") filterParams.set("location", locationCategoryFilter);
+                if (userFilter !== "All") filterParams.set("user", userFilter);
+                if (groupFilter !== "All") filterParams.set("group", groupFilter);
+                const queryString = filterParams.toString();
+                const taskUrl = `/task/${task.id}${queryString ? `?${queryString}` : ""}`;
+                const location = locations.find(l => l.id === task.locationId);
+                const assignedUser = allUsers.find(u => u.id === task.assignedTo);
+                const priorityColors: Record<string, string> = {
+                  "Red Flag": "bg-red-100 text-red-800 border-red-300",
+                  "High": "bg-orange-100 text-orange-800 border-orange-300",
+                  "Normal": "bg-blue-100 text-blue-800 border-blue-300",
+                  "Low": "bg-green-100 text-green-800 border-green-300"
+                };
+                
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => setLocation(taskUrl)}
+                    className={cn(
+                      "flex items-center gap-4 p-3 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer",
+                      task.status === "Resolved" && "bg-green-50/50 border-green-200"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-1 h-12 rounded-full shrink-0",
+                      task.status === "Resolved" ? "bg-green-500" :
+                      task.priority === "Red Flag" ? "bg-red-500" :
+                      task.priority === "High" ? "bg-orange-500" :
+                      task.priority === "Normal" ? "bg-blue-500" : "bg-green-500"
+                    )} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium truncate">{task.title}</span>
+                        <Badge variant="outline" className={cn("text-xs shrink-0", priorityColors[task.priority])}>
+                          {task.priority}
+                        </Badge>
+                        {task.status === "Resolved" && (
+                          <Badge className="bg-green-100 text-green-800 border-green-300 text-xs shrink-0">
+                            Resolved
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {location?.name || "Unknown"}
+                        </span>
+                        {assignedUser && (
+                          <span className="truncate">→ {assignedUser.name}</span>
+                        )}
+                      </div>
+                    </div>
+                    {(task as any).hasImage && (
+                      <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
+                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            )
           ) : (
             <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
               <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
