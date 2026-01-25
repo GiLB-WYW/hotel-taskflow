@@ -5,11 +5,14 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import type { Category, Location, User as DbUser, MaintenanceGroup } from "@shared/schema";
+import type { Category, Location as LocationType, User as DbUser, MaintenanceGroup } from "@shared/schema";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
   const searchParams = useSearch();
@@ -19,6 +22,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState(urlParams.get("priority") || "All");
   const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
+  const [locationFilter, setLocationFilter] = useState("All");
+  const [locationSearchOpen, setLocationSearchOpen] = useState(false);
   const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
   const [groupFilter, setGroupFilter] = useState("All");
   const [, setLocation] = useLocation();
@@ -40,7 +45,7 @@ export default function Dashboard() {
   });
 
   // Fetch locations from API
-  const { data: locations = [] } = useQuery<Location[]>({
+  const { data: locations = [] } = useQuery<LocationType[]>({
     queryKey: ["/api/locations"],
   });
 
@@ -126,6 +131,12 @@ export default function Dashboard() {
       matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
     }
 
+    // Match by specific location
+    let matchesLocation = true;
+    if (locationFilter !== "All") {
+      matchesLocation = task.locationId === locationFilter;
+    }
+
     // Match by user (assigned to only)
     let matchesUser = true;
     if (userFilter !== "All") {
@@ -140,7 +151,7 @@ export default function Dashboard() {
         (selectedGroup ? task.assignedGroup === selectedGroup.name : false);
     }
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesUser && matchesGroup;
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesLocation && matchesUser && matchesGroup;
   });
 
   // Sort by Priority (Red Flag first), then by creation date (newest first)
@@ -284,17 +295,76 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            <Select value={locationCategoryFilter} onValueChange={setLocationCategoryFilter}>
+            <Select value={locationCategoryFilter} onValueChange={(val) => {
+              setLocationCategoryFilter(val);
+              setLocationFilter("All");
+            }}>
               <SelectTrigger className="w-32 sm:w-40 bg-background text-sm flex-shrink-0">
-                <SelectValue placeholder="Location" />
+                <SelectValue placeholder="Building" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Locations</SelectItem>
+                <SelectItem value="All">All Buildings</SelectItem>
                 {locationCategories.map(category => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            <Popover open={locationSearchOpen} onOpenChange={setLocationSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={locationSearchOpen}
+                  className="w-40 sm:w-48 justify-between bg-background text-sm flex-shrink-0"
+                >
+                  <MapPin className="h-4 w-4 mr-1 shrink-0" />
+                  <span className="truncate">
+                    {locationFilter === "All"
+                      ? "All Locations"
+                      : locations.find(l => l.id === locationFilter)?.name || "Select..."}
+                  </span>
+                  <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search locations..." />
+                  <CommandList>
+                    <CommandEmpty>No location found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setLocationFilter("All");
+                          setLocationSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", locationFilter === "All" ? "opacity-100" : "opacity-0")} />
+                        All Locations
+                      </CommandItem>
+                      {locations
+                        .filter(loc => locationCategoryFilter === "All" || loc.category === locationCategoryFilter)
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(loc => (
+                          <CommandItem
+                            key={loc.id}
+                            value={loc.name}
+                            onSelect={() => {
+                              setLocationFilter(loc.id);
+                              setLocationSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", locationFilter === loc.id ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">{loc.name}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">{loc.category}</span>
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
@@ -348,6 +418,7 @@ export default function Dashboard() {
                 setPriorityFilter("All");
                 setUserFilter("All");
                 setLocationCategoryFilter("All");
+                setLocationFilter("All");
                 setGroupFilter("All");
               }}
               title="Reset all filters"
@@ -402,7 +473,7 @@ export default function Dashboard() {
               <Button 
                 variant="link" 
                 className="mt-2 text-primary" 
-                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All"); setGroupFilter("All");}}
+                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All"); setLocationFilter("All"); setGroupFilter("All");}}
               >
                 Clear all filters
               </Button>
