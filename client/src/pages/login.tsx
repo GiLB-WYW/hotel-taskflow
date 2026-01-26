@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +14,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [dialogEmail, setDialogEmail] = useState("");
+  const [dialogProvider, setDialogProvider] = useState<"google" | "microsoft">("google");
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,14 +111,18 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const googleEmail = prompt("Enter your registered email address:");
-    
-    if (!googleEmail || !googleEmail.trim()) {
+  const handleGoogleLogin = () => {
+    setDialogProvider("google");
+    setDialogEmail("");
+    setEmailDialogOpen(true);
+  };
+
+  const handleEmailDialogSubmit = async () => {
+    if (!dialogEmail || !dialogEmail.trim()) {
       return;
     }
     
-    if (!googleEmail.includes("@")) {
+    if (!dialogEmail.includes("@")) {
       toast({
         title: "Invalid Email",
         description: "Please enter a valid email address.",
@@ -123,6 +131,7 @@ export default function Login() {
       return;
     }
 
+    setEmailDialogOpen(false);
     setIsLoading(true);
     
     try {
@@ -131,7 +140,7 @@ export default function Login() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: googleEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email: dialogEmail.trim().toLowerCase() }),
       });
 
       if (!response.ok) {
@@ -175,72 +184,10 @@ export default function Login() {
     }
   };
 
-  const handleMicrosoftLogin = async () => {
-    const microsoftEmail = prompt("Enter your registered email address:");
-    
-    if (!microsoftEmail || !microsoftEmail.trim()) {
-      return;
-    }
-    
-    if (!microsoftEmail.includes("@")) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      const response = await fetch("/api/auth/email-login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: microsoftEmail.trim().toLowerCase() }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        toast({
-          title: "Login Failed",
-          description: data.error || "No account found with this email.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-      
-      localStorage.setItem("user", JSON.stringify({
-        id: data.id,
-        email: data.email,
-        name: data.name,
-        role: data.role,
-        group: data.group,
-        groups: data.groups,
-        provider: "microsoft",
-        avatar: data.name?.[0]?.toUpperCase() || "M",
-      }));
-      
-      toast({
-        title: "Login Successful",
-        description: `Welcome, ${data.name}!`,
-      });
-      
-      window.location.replace("/");
-    } catch (error) {
-      console.error("Microsoft login error:", error);
-      toast({
-        title: "Login Failed",
-        description: "Unable to connect to the server. Please try again.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-    }
+  const handleMicrosoftLogin = () => {
+    setDialogProvider("microsoft");
+    setDialogEmail("");
+    setEmailDialogOpen(true);
   };
 
   return (
@@ -411,6 +358,43 @@ export default function Login() {
           Hotel maintenance task management system
         </p>
       </div>
+
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sign in with {dialogProvider === "google" ? "Google" : "Microsoft"}</DialogTitle>
+            <DialogDescription>
+              Enter your registered email address to sign in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                value={dialogEmail}
+                onChange={(e) => setDialogEmail(e.target.value)}
+                className="pl-10"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleEmailDialogSubmit();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEmailDialogSubmit} disabled={!dialogEmail.trim()}>
+              Sign In
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
