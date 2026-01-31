@@ -163,10 +163,11 @@ export default function TaskDetail() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Find current task index and adjacent tasks
+  // Find current task index and adjacent tasks (loop around for infinite swiping)
   const currentIndex = sortedTasks.findIndex(t => t.id === params?.id);
-  const prevTask = currentIndex > 0 ? sortedTasks[currentIndex - 1] : null;
-  const nextTask = currentIndex < sortedTasks.length - 1 ? sortedTasks[currentIndex + 1] : null;
+  const tasksCount = sortedTasks.length;
+  const prevTask = tasksCount > 0 ? sortedTasks[(currentIndex - 1 + tasksCount) % tasksCount] : null;
+  const nextTask = tasksCount > 0 ? sortedTasks[(currentIndex + 1) % tasksCount] : null;
 
   // Navigation functions (preserve filter params)
   const goToPrevTask = useCallback(() => {
@@ -486,13 +487,7 @@ export default function TaskDetail() {
             {/* Previous Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToPrevTask}
-              disabled={!prevTask}
-              className={cn(
-                "hidden md:flex absolute -left-16 lg:-left-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all",
-                prevTask 
-                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
-                  : "opacity-30 cursor-not-allowed border-muted"
-              )}
+              className="hidden md:flex absolute -left-16 lg:-left-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30"
               data-testid="button-prev-task"
               aria-label="Previous Task"
             >
@@ -502,13 +497,7 @@ export default function TaskDetail() {
             {/* Next Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToNextTask}
-              disabled={!nextTask}
-              className={cn(
-                "hidden md:flex absolute -right-16 lg:-right-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all",
-                nextTask 
-                  ? "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30" 
-                  : "opacity-30 cursor-not-allowed border-muted"
-              )}
+              className="hidden md:flex absolute -right-16 lg:-right-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30"
               data-testid="button-next-task"
               aria-label="Next Task"
             >
@@ -523,8 +512,8 @@ export default function TaskDetail() {
             <span className="font-semibold text-foreground">{currentIndex + 1}</span>
             <span> of </span>
             <span className="font-semibold text-foreground">{sortedTasks.length}</span>
-            <span className="ml-2 text-xs md:hidden">← Swipe to navigate →</span>
-            <span className="ml-2 text-xs hidden md:inline">← Use arrows or keyboard →</span>
+            <span className="ml-2 text-xs md:hidden">↻ Swipe to navigate</span>
+            <span className="ml-2 text-xs hidden md:inline">↻ Use arrows or keyboard</span>
           </div>
         )}
 
