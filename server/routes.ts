@@ -759,6 +759,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hasImage: true
           };
         }
+        // For URL images, also mark as hasImage so thumbnails are shown
+        if (task.imageUrl && (task.imageUrl.startsWith('http://') || task.imageUrl.startsWith('https://'))) {
+          return {
+            ...task,
+            hasImage: true
+          };
+        }
         return task;
       });
       

@@ -644,7 +644,7 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
-                    {(task as any).hasImage && (
+                    {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
                       <div className="h-10 w-10 rounded overflow-hidden bg-muted shrink-0 border border-border">
                         <img 
                           src={`/api/tasks/${task.id}/thumbnail`} 

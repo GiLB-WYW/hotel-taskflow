@@ -65,12 +65,7 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
             {task.title}
           </h3>
         </div>
-        {task.imageUrl && task.imageUrl !== 'HAS_IMAGE' && (
-          <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border">
-            <img src={task.imageUrl} alt="Task" className="h-full w-full object-cover" />
-          </div>
-        )}
-        {(task as any).hasImage && (
+        {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
           <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border bg-muted">
             <img 
               src={`/api/tasks/${task.id}/thumbnail`} 
