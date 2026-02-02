@@ -5,7 +5,8 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download } from "lucide-react";
+import jsPDF from "jspdf";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -168,6 +169,91 @@ export default function Dashboard() {
   });
 
   const redFlagCount = tasks.filter(t => t.priority === "Red Flag").length;
+
+  const downloadTaskListPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Task List", pageWidth / 2, yPos, { align: "center" });
+    yPos += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const dateStr = new Date().toLocaleDateString("fr-FR", { 
+      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" 
+    });
+    doc.text(`Generated: ${dateStr}`, pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+    
+    const activeFilters = [];
+    if (statusFilter !== "All") activeFilters.push(`Status: ${statusFilter}`);
+    if (priorityFilter !== "All") activeFilters.push(`Priority: ${priorityFilter}`);
+    if (locationCategoryFilter !== "All") activeFilters.push(`Building: ${locationCategoryFilter}`);
+    if (locationFilter !== "All") {
+      const loc = locations.find(l => l.id === locationFilter);
+      activeFilters.push(`Location: ${loc?.name || locationFilter}`);
+    }
+    if (userFilter !== "All") {
+      const user = allUsers.find(u => u.id === userFilter);
+      activeFilters.push(`Assigned: ${user?.name || userFilter}`);
+    }
+    if (groupFilter !== "All") {
+      const group = maintenanceGroups.find(g => g.id === groupFilter);
+      activeFilters.push(`Group: ${group?.name || groupFilter}`);
+    }
+    if (activeFilters.length > 0) {
+      doc.text(`Filters: ${activeFilters.join(" | ")}`, pageWidth / 2, yPos, { align: "center" });
+      yPos += 5;
+    }
+    
+    doc.text(`Total: ${sortedTasks.length} tasks`, pageWidth / 2, yPos, { align: "center" });
+    yPos += 15;
+    
+    doc.setDrawColor(200);
+    doc.line(15, yPos - 5, pageWidth - 15, yPos - 5);
+    
+    sortedTasks.forEach((task, index) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      const location = locations.find(l => l.id === task.locationId);
+      const assignedUser = allUsers.find(u => u.id === task.assignedTo);
+      
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      const priorityLabel = `[${task.priority}]`;
+      const statusLabel = task.status === "Resolved" ? " ✓" : "";
+      doc.text(`${index + 1}. ${priorityLabel} ${task.title}${statusLabel}`, 15, yPos);
+      yPos += 5;
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100);
+      doc.text(`   Location: ${location?.name || "Unknown"} | Status: ${task.status}`, 15, yPos);
+      yPos += 4;
+      
+      if (assignedUser) {
+        doc.text(`   Assigned to: ${assignedUser.name}`, 15, yPos);
+        yPos += 4;
+      }
+      
+      if (task.description) {
+        const desc = task.description.length > 100 ? task.description.substring(0, 100) + "..." : task.description;
+        doc.text(`   ${desc}`, 15, yPos);
+        yPos += 4;
+      }
+      
+      doc.setTextColor(0);
+      yPos += 4;
+    });
+    
+    doc.save(`task-list-${new Date().toISOString().split("T")[0]}.pdf`);
+  };
 
   if (isLoading) {
     return (
@@ -439,25 +525,38 @@ export default function Dashboard() {
                 {sortedTasks.length}
               </Badge>
             </h3>
-            <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/50">
+            <div className="flex items-center gap-2">
               <Button
-                variant={viewMode === "cards" ? "secondary" : "ghost"}
+                variant="outline"
                 size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setViewMode("cards")}
-                title="Card view"
+                className="h-8 gap-1.5"
+                onClick={downloadTaskListPDF}
+                title="Download as PDF"
+                disabled={sortedTasks.length === 0}
               >
-                <LayoutGrid className="h-4 w-4" />
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">PDF</span>
               </Button>
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setViewMode("list")}
-                title="List view"
-              >
-                <List className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/50">
+                <Button
+                  variant={viewMode === "cards" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setViewMode("cards")}
+                  title="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setViewMode("list")}
+                  title="List view"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
           
