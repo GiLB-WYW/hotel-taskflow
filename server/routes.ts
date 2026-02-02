@@ -817,9 +817,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // If it's a URL, redirect to it
+      // If it's a URL, fetch and proxy the image to avoid CORS issues
       if (task.imageUrl.startsWith('http')) {
-        return res.redirect(task.imageUrl);
+        try {
+          const imageResponse = await fetch(task.imageUrl);
+          if (!imageResponse.ok) {
+            return res.status(404).json({ error: "Failed to fetch external image" });
+          }
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(imageBuffer);
+        } catch (fetchError) {
+          console.error("Error fetching external image:", fetchError);
+          return res.status(500).json({ error: "Failed to fetch external image" });
+        }
       }
       
       res.status(404).json({ error: "Invalid image format" });
