@@ -92,11 +92,9 @@ export function NotificationDropdown() {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
     }
-    // For Red Flag notifications, navigate to dashboard with Red Flag filter
-    if (notification.type === "red_flag_assigned") {
-      setLocation(`/?priority=Red+Flag&user=${userId}`);
-    } else if (notification.taskId) {
-      setLocation(`/tasks?taskId=${notification.taskId}`);
+    // Navigate to task detail page
+    if (notification.taskId) {
+      setLocation(`/task/${notification.taskId}`);
     }
   };
 
@@ -249,11 +247,9 @@ export function MobileNotificationBell() {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
     }
-    // For Red Flag notifications, navigate to dashboard with Red Flag filter
-    if (notification.type === "red_flag_assigned") {
-      setLocation(`/?priority=Red+Flag&user=${userId}`);
-    } else if (notification.taskId) {
-      setLocation(`/tasks?taskId=${notification.taskId}`);
+    // Navigate to task detail page
+    if (notification.taskId) {
+      setLocation(`/task/${notification.taskId}`);
     }
     setIsOpen(false);
   };
