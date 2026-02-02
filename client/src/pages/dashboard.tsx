@@ -645,8 +645,13 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {(task as any).hasImage && (
-                      <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
-                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                      <div className="h-10 w-10 rounded overflow-hidden bg-muted shrink-0 border border-border">
+                        <img 
+                          src={`/api/tasks/${task.id}/thumbnail`} 
+                          alt="Task" 
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       </div>
                     )}
                   </div>
