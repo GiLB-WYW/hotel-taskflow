@@ -170,10 +170,31 @@ export default function Dashboard() {
 
   const redFlagCount = tasks.filter(t => t.priority === "Red Flag").length;
 
-  const downloadTaskListPDF = () => {
+  const downloadTaskListPDF = async () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
+    
+    // Pre-fetch thumbnails for tasks with images
+    const imageCache: Record<string, string> = {};
+    const tasksWithImages = sortedTasks.filter(t => (t as any).hasImage || (t.imageUrl && t.imageUrl !== 'HAS_IMAGE'));
+    
+    await Promise.all(tasksWithImages.map(async (task) => {
+      try {
+        const response = await fetch(`/api/tasks/${task.id}/thumbnail`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          imageCache[task.id] = base64;
+        }
+      } catch (e) {
+        console.log("Failed to load thumbnail for task:", task.id);
+      }
+    }));
     
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
@@ -215,8 +236,13 @@ export default function Dashboard() {
     doc.setDrawColor(200);
     doc.line(15, yPos - 5, pageWidth - 15, yPos - 5);
     
+    const thumbnailSize = 20;
+    
     sortedTasks.forEach((task, index) => {
-      if (yPos > 270) {
+      const hasImage = imageCache[task.id];
+      const rowHeight = hasImage ? Math.max(thumbnailSize + 4, 22) : 22;
+      
+      if (yPos + rowHeight > 280) {
         doc.addPage();
         yPos = 20;
       }
@@ -224,11 +250,23 @@ export default function Dashboard() {
       const location = locations.find(l => l.id === task.locationId);
       const assignedUser = allUsers.find(u => u.id === task.assignedTo);
       
+      // Add thumbnail if available
+      if (hasImage) {
+        try {
+          doc.addImage(imageCache[task.id], 'JPEG', pageWidth - 15 - thumbnailSize, yPos - 2, thumbnailSize, thumbnailSize);
+        } catch (e) {
+          console.log("Failed to add image to PDF");
+        }
+      }
+      
+      const textWidth = hasImage ? pageWidth - 40 - thumbnailSize : pageWidth - 30;
+      
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       const priorityLabel = `[${task.priority}]`;
       const statusLabel = task.status === "Resolved" ? " ✓" : "";
-      doc.text(`${index + 1}. ${priorityLabel} ${task.title}${statusLabel}`, 15, yPos);
+      const titleText = `${index + 1}. ${priorityLabel} ${task.title}${statusLabel}`;
+      doc.text(titleText.substring(0, 70) + (titleText.length > 70 ? "..." : ""), 15, yPos);
       yPos += 5;
       
       doc.setFontSize(9);
@@ -243,13 +281,14 @@ export default function Dashboard() {
       }
       
       if (task.description) {
-        const desc = task.description.length > 100 ? task.description.substring(0, 100) + "..." : task.description;
+        const maxDescLen = hasImage ? 80 : 100;
+        const desc = task.description.length > maxDescLen ? task.description.substring(0, maxDescLen) + "..." : task.description;
         doc.text(`   ${desc}`, 15, yPos);
         yPos += 4;
       }
       
       doc.setTextColor(0);
-      yPos += 4;
+      yPos += hasImage ? thumbnailSize - 8 : 4;
     });
     
     doc.save(`task-list-${new Date().toISOString().split("T")[0]}.pdf`);
