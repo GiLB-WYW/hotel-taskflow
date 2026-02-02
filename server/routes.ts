@@ -790,6 +790,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint to get task thumbnail image
+  app.get("/api/tasks/:id/thumbnail", async (req, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task || !task.imageUrl) {
+        return res.status(404).json({ error: "Image not found" });
+      }
+      
+      // If it's a base64 image, convert and send
+      if (task.imageUrl.startsWith('data:image')) {
+        const matches = task.imageUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (matches) {
+          const imageType = matches[1];
+          const imageData = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', `image/${imageType}`);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(imageData);
+        }
+      }
+      
+      // If it's a URL, redirect to it
+      if (task.imageUrl.startsWith('http')) {
+        return res.redirect(task.imageUrl);
+      }
+      
+      res.status(404).json({ error: "Invalid image format" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch thumbnail" });
+    }
+  });
+
   app.post("/api/tasks", async (req, res) => {
     try {
       console.log("Creating task with data:", { ...req.body, imageUrl: req.body.imageUrl ? `[image: ${req.body.imageUrl.substring(0, 50)}...]` : null });

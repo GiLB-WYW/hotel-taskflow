@@ -71,8 +71,22 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
           </div>
         )}
         {(task as any).hasImage && (
-          <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border bg-muted flex items-center justify-center">
-            <Image className="h-6 w-6 text-muted-foreground" />
+          <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border bg-muted">
+            <img 
+              src={`/api/tasks/${task.id}/thumbnail`} 
+              alt="Task" 
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.classList.add('flex', 'items-center', 'justify-center');
+                  parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                }
+              }}
+            />
           </div>
         )}
       </CardHeader>
