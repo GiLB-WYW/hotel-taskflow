@@ -240,7 +240,7 @@ export default function Dashboard() {
     
     sortedTasks.forEach((task, index) => {
       const hasImage = imageCache[task.id];
-      const rowHeight = hasImage ? Math.max(thumbnailSize + 4, 22) : 22;
+      const rowHeight = thumbnailSize + 6;
       
       if (yPos + rowHeight > 280) {
         doc.addPage();
@@ -250,23 +250,29 @@ export default function Dashboard() {
       const location = locations.find(l => l.id === task.locationId);
       const assignedUser = allUsers.find(u => u.id === task.assignedTo);
       
-      // Add thumbnail if available
+      const thumbnailX = pageWidth - 15 - thumbnailSize;
+      const thumbnailY = yPos - 2;
+      
+      // Always draw a square placeholder
+      doc.setDrawColor(180);
+      doc.setFillColor(245, 245, 245);
+      doc.rect(thumbnailX, thumbnailY, thumbnailSize, thumbnailSize, 'FD');
+      
+      // Add thumbnail image if available
       if (hasImage) {
         try {
-          doc.addImage(imageCache[task.id], 'JPEG', pageWidth - 15 - thumbnailSize, yPos - 2, thumbnailSize, thumbnailSize);
+          doc.addImage(imageCache[task.id], 'JPEG', thumbnailX, thumbnailY, thumbnailSize, thumbnailSize);
         } catch (e) {
           console.log("Failed to add image to PDF");
         }
       }
-      
-      const textWidth = hasImage ? pageWidth - 40 - thumbnailSize : pageWidth - 30;
       
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       const priorityLabel = `[${task.priority}]`;
       const statusLabel = task.status === "Resolved" ? " ✓" : "";
       const titleText = `${index + 1}. ${priorityLabel} ${task.title}${statusLabel}`;
-      doc.text(titleText.substring(0, 70) + (titleText.length > 70 ? "..." : ""), 15, yPos);
+      doc.text(titleText.substring(0, 60) + (titleText.length > 60 ? "..." : ""), 15, yPos);
       yPos += 5;
       
       doc.setFontSize(9);
@@ -281,14 +287,13 @@ export default function Dashboard() {
       }
       
       if (task.description) {
-        const maxDescLen = hasImage ? 80 : 100;
-        const desc = task.description.length > maxDescLen ? task.description.substring(0, maxDescLen) + "..." : task.description;
+        const desc = task.description.length > 70 ? task.description.substring(0, 70) + "..." : task.description;
         doc.text(`   ${desc}`, 15, yPos);
         yPos += 4;
       }
       
       doc.setTextColor(0);
-      yPos += hasImage ? thumbnailSize - 8 : 4;
+      yPos += 8;
     });
     
     doc.save(`task-list-${new Date().toISOString().split("T")[0]}.pdf`);
