@@ -418,58 +418,51 @@ export default function CreateTask() {
         {step === "capture" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             
-            {/* Voice Recorder Card */}
+            {/* Voice Recorder Card - Compact */}
             <Card className="border-2 border-dashed border-primary/20 bg-muted/30">
-              <CardContent className="flex flex-col items-center justify-center py-12 space-y-6">
+              <CardContent className="flex flex-col items-center justify-center py-4 space-y-2">
                 {isRecording ? (
-                  <div className="flex flex-col items-center space-y-4">
+                  <div className="flex items-center gap-4">
                     <div className="relative">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-                      <div className="h-24 w-24 rounded-full bg-red-500 flex items-center justify-center shadow-lg z-10 relative">
-                        <Mic className="h-10 w-10 text-white" />
+                      <div className="h-12 w-12 rounded-full bg-red-500 flex items-center justify-center shadow-lg z-10 relative">
+                        <Mic className="h-5 w-5 text-white" />
                       </div>
                     </div>
-                    <div className="text-2xl font-mono font-medium text-primary">
+                    <div className="text-lg font-mono font-medium text-primary">
                       {formatTime(recordingTime)}
                     </div>
-                    <p className="text-sm text-muted-foreground animate-pulse">Recording...</p>
                     <Button 
-                      size="lg" 
+                      size="sm" 
                       variant="destructive" 
-                      className="w-40 rounded-full mt-4"
+                      className="rounded-full"
                       onClick={stopRecording}
                     >
-                      <Square className="h-4 w-4 mr-2 fill-current" /> Stop
+                      <Square className="h-3 w-3 mr-1 fill-current" /> Stop
                     </Button>
                   </div>
                 ) : (
                   <>
                     {audioUrl ? (
-                      <div className="flex flex-col items-center space-y-4 w-full">
-                         <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
-                           <Check className="h-8 w-8 text-green-600" />
+                      <div className="flex items-center gap-3 w-full justify-center">
+                         <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                           <Check className="h-5 w-5 text-green-600" />
                          </div>
-                         <p className="font-medium text-green-700">Audio Captured</p>
-                         <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => setAudioUrl(null)}>
-                              <RotateCcw className="h-4 w-4 mr-2" /> Retake
-                            </Button>
-                            <Button variant="secondary" className="gap-2">
-                              <Play className="h-4 w-4" /> Play
-                            </Button>
-                         </div>
+                         <p className="font-medium text-green-700 text-sm">Audio Ready</p>
+                         <Button size="sm" variant="outline" onClick={() => setAudioUrl(null)}>
+                           <RotateCcw className="h-3 w-3 mr-1" /> Retake
+                         </Button>
                       </div>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-3">
                         <Button 
-                          size="lg" 
-                          className="h-24 w-24 rounded-full bg-primary hover:bg-primary/90 shadow-xl hover:scale-105 transition-all duration-300"
+                          className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg hover:scale-105 transition-all duration-300"
                           onClick={startRecording}
                         >
-                          <Mic className="h-10 w-10 text-white" />
+                          <Mic className="h-6 w-6 text-white" />
                         </Button>
                         <p className="text-sm font-medium text-muted-foreground">Tap to Record</p>
-                      </>
+                      </div>
                     )}
                   </>
                 )}
