@@ -76,15 +76,18 @@ export default function ShoppingList() {
       newChecked.delete(itemId);
     } else {
       newChecked.add(itemId);
-      setTimeout(() => {
-        deleteItemMutation.mutate(itemId);
-        newChecked.delete(itemId);
-        setCheckedItems(new Set(newChecked));
-        toast({ title: "Produit acheté et retiré de la liste" });
-      }, 500);
     }
     setCheckedItems(newChecked);
   };
+
+  // Sort items: unchecked first, checked at bottom
+  const sortedItems = [...items].sort((a, b) => {
+    const aChecked = checkedItems.has(a.id);
+    const bChecked = checkedItems.has(b.id);
+    if (aChecked && !bChecked) return 1;
+    if (!aChecked && bChecked) return -1;
+    return 0;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
@@ -153,7 +156,7 @@ export default function ShoppingList() {
               </p>
             ) : (
               <div className="space-y-2">
-                {items.map((item) => (
+                {sortedItems.map((item) => (
                   <div
                     key={item.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
