@@ -18,6 +18,8 @@ import {
   type InsertNotification,
   type ActivityLog,
   type InsertActivityLog,
+  type ShoppingItem,
+  type InsertShoppingItem,
   usersTable,
   categoriesTable,
   locationsTable,
@@ -27,6 +29,7 @@ import {
   invitationsTable,
   notificationsTable,
   activityLogTable,
+  shoppingItemsTable,
   insertUserSchema,
   insertCategorySchema,
   insertLocationSchema,
@@ -36,6 +39,7 @@ import {
   insertInvitationSchema,
   insertNotificationSchema,
   insertActivityLogSchema,
+  insertShoppingItemSchema,
 } from "@shared/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { ZodError } from "zod";
@@ -123,6 +127,11 @@ export interface IStorage {
 
   // Get tasks resolved on a specific date
   getResolvedTasksForDate(date: Date): Promise<Task[]>;
+
+  // Shopping Items
+  createShoppingItem(item: InsertShoppingItem): Promise<ShoppingItem>;
+  deleteShoppingItem(id: string): Promise<void>;
+  listShoppingItems(): Promise<ShoppingItem[]>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -523,6 +532,20 @@ export class PostgresStorage implements IStorage {
         lte(tasksTable.updatedAt, endOfDay)
       ))
       .orderBy(desc(tasksTable.updatedAt));
+  }
+
+  async createShoppingItem(item: InsertShoppingItem): Promise<ShoppingItem> {
+    const validated = insertShoppingItemSchema.parse(item);
+    const result = await db.insert(shoppingItemsTable).values(validated).returning();
+    return result[0];
+  }
+
+  async deleteShoppingItem(id: string): Promise<void> {
+    await db.delete(shoppingItemsTable).where(eq(shoppingItemsTable.id, id));
+  }
+
+  async listShoppingItems(): Promise<ShoppingItem[]> {
+    return await db.select().from(shoppingItemsTable).orderBy(desc(shoppingItemsTable.createdAt));
   }
 }
 

@@ -18,6 +18,7 @@ import ResetPassword from "@/pages/reset-password";
 import AcceptInvite from "@/pages/accept-invite";
 import Settings from "@/pages/settings";
 import ActivityLog from "@/pages/activity-log";
+import ShoppingList from "@/pages/shopping-list";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
@@ -43,6 +44,7 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Route path="/location/:id" component={LocationDetail} />
       <Route path="/settings" component={Settings} />
       <Route path="/activity-log" component={ActivityLog} />
+      <Route path="/shopping-list" component={ShoppingList} />
       <Route component={NotFound} />
     </Switch>
   );

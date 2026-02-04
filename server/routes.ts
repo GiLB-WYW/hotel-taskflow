@@ -1355,6 +1355,34 @@ ${content}`;
     }
   });
 
+  // Shopping Items Routes
+  app.get("/api/shopping-items", async (req, res) => {
+    try {
+      const items = await storage.listShoppingItems();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shopping items" });
+    }
+  });
+
+  app.post("/api/shopping-items", async (req, res) => {
+    try {
+      const item = await storage.createShoppingItem(req.body);
+      res.status(201).json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create shopping item" });
+    }
+  });
+
+  app.delete("/api/shopping-items/:id", async (req, res) => {
+    try {
+      await storage.deleteShoppingItem(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete shopping item" });
+    }
+  });
+
   // Start the daily summary scheduler (runs every hour, checks if it's after 23:00)
   let lastSummaryDate: string | null = null;
   
