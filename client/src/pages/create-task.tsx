@@ -72,7 +72,8 @@ export default function CreateTask() {
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   // Recording Timer
@@ -179,8 +180,11 @@ export default function CreateTask() {
   };
 
   const takePhoto = () => {
-    // Trigger the hidden file input
-    fileInputRef.current?.click();
+    cameraInputRef.current?.click();
+  };
+
+  const uploadPhoto = () => {
+    uploadInputRef.current?.click();
   };
 
   // Compress and resize image to reduce database traffic
@@ -488,45 +492,71 @@ export default function CreateTask() {
               </CardContent>
             </Card>
 
-            {/* Photo Capture or Upload */}
+            {/* Camera Capture Input */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoSelected}
+            />
+            {/* File Upload Input */}
+            <input
+              ref={uploadInputRef}
               type="file"
               accept="image/*"
               className="hidden"
               onChange={handlePhotoSelected}
             />
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            
+            {/* Photo preview if taken */}
+            {photo && (
+              <div className="relative h-32 rounded-lg overflow-hidden border-2 border-green-500">
+                <img src={photo} className="h-full w-full object-cover" alt="Task photo" />
+                <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                  <Check className="h-4 w-4 text-white" />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 left-2 bg-white/80 hover:bg-white h-8 w-8"
+                  onClick={() => setPhoto(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <Button 
                 variant="outline" 
-                className="h-24 flex flex-col gap-2 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50"
+                className="h-20 flex flex-col gap-1 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50"
                 onClick={takePhoto}
-                data-testid="button-add-photo"
+                data-testid="button-take-photo"
               >
-                {photo ? (
-                   <div className="relative h-full w-full overflow-hidden rounded">
-                     <img src={photo} className="h-full w-full object-cover opacity-50" alt="Captured task photo" />
-                     <div className="absolute inset-0 flex items-center justify-center">
-                        <Check className="h-6 w-6 text-green-600" />
-                     </div>
-                   </div>
-                ) : (
-                  <>
-                    <Camera className="h-6 w-6 text-muted-foreground" />
-                    <span>Photo / Upload</span>
-                  </>
-                )}
+                <Camera className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs">Camera</span>
               </Button>
-               <Button 
-                className="h-24 flex flex-col gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+              <Button 
+                variant="outline" 
+                className="h-20 flex flex-col gap-1 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50"
+                onClick={uploadPhoto}
+                data-testid="button-upload-photo"
+              >
+                <Upload className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs">Upload</span>
+              </Button>
+              <Button 
+                className="h-20 flex flex-col gap-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
                 disabled={!audioUrl && !photo && !textInput.trim()}
                 onClick={processAI}
                 data-testid="button-process-task"
               >
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/20 mb-1">
-                  <span className="text-lg font-bold">AI</span>
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-white/20">
+                  <span className="text-sm font-bold">AI</span>
                 </div>
-                <span>Process Task</span>
+                <span className="text-xs">Process</span>
               </Button>
             </div>
           </div>
