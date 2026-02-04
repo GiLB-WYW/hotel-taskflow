@@ -488,12 +488,11 @@ export default function CreateTask() {
               </CardContent>
             </Card>
 
-            {/* Photo Capture */}
+            {/* Photo Capture or Upload */}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={handlePhotoSelected}
             />
@@ -514,7 +513,7 @@ export default function CreateTask() {
                 ) : (
                   <>
                     <Camera className="h-6 w-6 text-muted-foreground" />
-                    <span>Add Photo</span>
+                    <span>Photo / Upload</span>
                   </>
                 )}
               </Button>
