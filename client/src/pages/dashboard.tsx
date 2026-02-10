@@ -413,7 +413,7 @@ export default function Dashboard() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 flex-shrink-0 scrollbar-thin" style={{ WebkitOverflowScrolling: "touch" }}>
              <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Status" />
