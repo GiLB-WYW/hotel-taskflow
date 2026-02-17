@@ -5,12 +5,13 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X } from "lucide-react";
 import jsPDF from "jspdf";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Category, Location as LocationType, User as DbUser, MaintenanceGroup } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,8 @@ export default function Dashboard() {
   const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
   const [groupFilter, setGroupFilter] = useState("All");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
@@ -170,14 +173,39 @@ export default function Dashboard() {
 
   const redFlagCount = tasks.filter(t => t.priority === "Red Flag").length;
 
-  const downloadTaskListPDF = async () => {
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTasks.size === sortedTasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(sortedTasks.map(t => t.id)));
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedTasks(new Set());
+  };
+
+  const downloadTaskListPDF = async (tasksToExport?: typeof sortedTasks) => {
+    const exportTasks = tasksToExport || sortedTasks;
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
     
-    // Pre-fetch thumbnails for tasks with images
     const imageCache: Record<string, string> = {};
-    const tasksWithImages = sortedTasks.filter(t => (t as any).hasImage || (t.imageUrl && t.imageUrl !== 'HAS_IMAGE'));
+    const tasksWithImages = exportTasks.filter(t => (t as any).hasImage || (t.imageUrl && t.imageUrl !== 'HAS_IMAGE'));
     
     await Promise.all(tasksWithImages.map(async (task) => {
       try {
@@ -230,7 +258,7 @@ export default function Dashboard() {
       yPos += 5;
     }
     
-    doc.text(`Total: ${sortedTasks.length} tasks`, pageWidth / 2, yPos, { align: "center" });
+    doc.text(`Total: ${exportTasks.length} tasks`, pageWidth / 2, yPos, { align: "center" });
     yPos += 15;
     
     doc.setDrawColor(200);
@@ -238,7 +266,7 @@ export default function Dashboard() {
     
     const thumbnailSize = 20;
     
-    sortedTasks.forEach((task, index) => {
+    exportTasks.forEach((task, index) => {
       const hasImage = imageCache[task.id];
       const rowHeight = thumbnailSize + 6;
       
@@ -571,15 +599,37 @@ export default function Dashboard() {
             </h3>
             <div className="flex items-center gap-2">
               <Button
+                variant={selectionMode ? "default" : "outline"}
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+                title={selectionMode ? "Cancel selection" : "Select tasks"}
+                disabled={sortedTasks.length === 0}
+                data-testid="button-toggle-selection"
+              >
+                {selectionMode ? <X className="h-4 w-4" /> : <CheckSquare className="h-4 w-4" />}
+                <span className="hidden sm:inline">{selectionMode ? "Cancel" : "Select"}</span>
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                onClick={downloadTaskListPDF}
-                title="Download as PDF"
-                disabled={sortedTasks.length === 0}
+                onClick={() => {
+                  if (selectionMode && selectedTasks.size > 0) {
+                    const selected = sortedTasks.filter(t => selectedTasks.has(t.id));
+                    downloadTaskListPDF(selected);
+                  } else {
+                    downloadTaskListPDF();
+                  }
+                }}
+                title={selectionMode && selectedTasks.size > 0 ? `Export ${selectedTasks.size} selected as PDF` : "Download all as PDF"}
+                disabled={sortedTasks.length === 0 || (selectionMode && selectedTasks.size === 0)}
+                data-testid="button-download-pdf"
               >
                 <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">PDF</span>
+                <span className="hidden sm:inline">
+                  {selectionMode && selectedTasks.size > 0 ? `PDF (${selectedTasks.size})` : "PDF"}
+                </span>
               </Button>
               <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/50">
                 <Button
@@ -604,6 +654,24 @@ export default function Dashboard() {
             </div>
           </div>
           
+          {selectionMode && sortedTasks.length > 0 && (
+            <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={toggleSelectAll}
+                data-testid="button-select-all"
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                {selectedTasks.size === sortedTasks.length ? "Deselect all" : "Select all"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {selectedTasks.size} of {sortedTasks.length} selected
+              </span>
+            </div>
+          )}
+          
           {sortedTasks.length > 0 ? (
             viewMode === "cards" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -626,6 +694,9 @@ export default function Dashboard() {
                     locations={locations}
                     users={allUsers}
                     maintenanceGroups={maintenanceGroups}
+                    selectionMode={selectionMode}
+                    isSelected={selectedTasks.has(task.id)}
+                    onSelect={toggleTaskSelection}
                   />
                 );
               })}
@@ -653,12 +724,22 @@ export default function Dashboard() {
                 return (
                   <div
                     key={task.id}
-                    onClick={() => setLocation(taskUrl)}
+                    onClick={() => selectionMode ? toggleTaskSelection(task.id) : setLocation(taskUrl)}
                     className={cn(
                       "flex items-center gap-4 p-3 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer",
-                      task.status === "Resolved" && "bg-green-50/50 border-green-200"
+                      task.status === "Resolved" && "bg-green-50/50 border-green-200",
+                      selectedTasks.has(task.id) && "ring-2 ring-primary bg-primary/5"
                     )}
                   >
+                    {selectionMode && (
+                      <Checkbox
+                        checked={selectedTasks.has(task.id)}
+                        className="h-5 w-5 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={() => toggleTaskSelection(task.id)}
+                        data-testid={`checkbox-list-task-${task.id}`}
+                      />
+                    )}
                     <div className={cn(
                       "w-1 h-12 rounded-full shrink-0",
                       task.status === "Resolved" ? "bg-green-500" :

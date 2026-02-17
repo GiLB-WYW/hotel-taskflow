@@ -1,6 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MapPin, Clock, AlertTriangle, CheckCircle, Image } from "lucide-react";
 import { Task, PRIORITIES } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
@@ -13,9 +14,12 @@ interface TaskCardProps {
   locations?: Location[];
   users?: User[];
   maintenanceGroups?: MaintenanceGroup[];
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, onClick, locations = [], users = [], maintenanceGroups = [] }: TaskCardProps) {
+export function TaskCard({ task, onClick, locations = [], users = [], maintenanceGroups = [], selectionMode = false, isSelected = false, onSelect }: TaskCardProps) {
   const priorityConfig = PRIORITIES[task.priority];
   const location = locations.find(l => l.id === task.locationId);
   const assignedUser = users.find(u => u.id === task.assignedTo);
@@ -33,17 +37,36 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
     }
   };
 
+  const handleClick = () => {
+    if (selectionMode && onSelect) {
+      onSelect(task.id);
+    } else if (onClick) {
+      onClick();
+    }
+  };
+
   return (
     <Card 
       className={cn(
         "overflow-hidden border-l-4 hover:shadow-md transition-all cursor-pointer group",
-        isResolved && "bg-green-50/50 dark:bg-green-950/20"
+        isResolved && "bg-green-50/50 dark:bg-green-950/20",
+        isSelected && "ring-2 ring-primary bg-primary/5"
       )}
       style={{ borderLeftColor: getBorderColor() }}
-      onClick={onClick}
+      onClick={handleClick}
     >
       <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between space-y-0">
-        <div className="space-y-1">
+        <div className="flex items-start gap-2">
+          {selectionMode && (
+            <Checkbox
+              checked={isSelected}
+              className="mt-1 h-5 w-5"
+              onClick={(e) => e.stopPropagation()}
+              onCheckedChange={() => onSelect?.(task.id)}
+              data-testid={`checkbox-task-${task.id}`}
+            />
+          )}
+          <div className="space-y-1">
           <div className="flex items-center gap-2">
             {isResolved ? (
               <Badge className="font-medium bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
@@ -64,6 +87,7 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
           <h3 className="font-serif font-semibold text-lg leading-tight text-primary group-hover:text-blue-700 transition-colors">
             {task.title}
           </h3>
+        </div>
         </div>
         {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
           <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 border border-border bg-muted">
