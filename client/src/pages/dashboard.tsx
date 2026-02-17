@@ -5,20 +5,23 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X, CheckCircle2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Category, Location as LocationType, User as DbUser, MaintenanceGroup } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const searchParams = useSearch();
   const urlParams = new URLSearchParams(searchParams);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState(urlParams.get("status") || "All");
@@ -33,6 +36,22 @@ export default function Dashboard() {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const markResolvedMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Resolved" }),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Task Resolved", description: "Task has been marked as resolved." });
+    },
+  });
   
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
@@ -696,6 +715,7 @@ export default function Dashboard() {
                     selectionMode={selectionMode}
                     isSelected={selectedTasks.has(task.id)}
                     onSelect={toggleTaskSelection}
+                    onMarkResolved={(id) => markResolvedMutation.mutate(id)}
                   />
                 );
               })}
@@ -768,6 +788,21 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
+                    {task.status !== "Resolved" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-green-600 hover:bg-green-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markResolvedMutation.mutate(task.id);
+                        }}
+                        title="Mark as resolved"
+                        data-testid={`button-resolve-list-${task.id}`}
+                      >
+                        <CheckCircle2 className="h-5 w-5" />
+                      </Button>
+                    )}
                     {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
                       <div className="h-10 w-10 rounded overflow-hidden bg-muted shrink-0 border border-border">
                         <img 
