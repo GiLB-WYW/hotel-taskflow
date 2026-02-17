@@ -21,27 +21,26 @@ export default function Dashboard() {
   const urlParams = new URLSearchParams(searchParams);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(urlParams.get("status") || "All");
   const [priorityFilter, setPriorityFilter] = useState(urlParams.get("priority") || "All");
-  const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
+  const [locationCategoryFilter, setLocationCategoryFilter] = useState(urlParams.get("location") || "All");
   const [locationFilter, setLocationFilter] = useState("All");
   const [locationSearchOpen, setLocationSearchOpen] = useState(false);
   const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
-  const [groupFilter, setGroupFilter] = useState("All");
+  const [groupFilter, setGroupFilter] = useState(urlParams.get("group") || "All");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Update filters when URL parameters change (including reset when params are removed)
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    const priority = params.get("priority");
-    const user = params.get("user");
-    // Set or reset filters based on URL params
-    setPriorityFilter(priority || "All");
-    setUserFilter(user || "All");
+    setPriorityFilter(params.get("priority") || "All");
+    setUserFilter(params.get("user") || "All");
+    setStatusFilter(params.get("status") || "All");
+    setLocationCategoryFilter(params.get("location") || "All");
+    setGroupFilter(params.get("group") || "All");
   }, [searchParams]);
 
   // Fetch categories (buildings) from API
