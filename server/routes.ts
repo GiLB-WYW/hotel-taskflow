@@ -7,9 +7,25 @@ import { sendInvitationEmail } from "./email";
 import crypto from "crypto";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
+async function ensureSmtrGroup() {
+  try {
+    const groups = await storage.listMaintenanceGroups();
+    const smtrExists = groups.some(g => g.name === "SMTR team");
+    if (!smtrExists) {
+      await storage.createMaintenanceGroup({ name: "SMTR team", memberCount: 0 });
+      console.log("SMTR team group created automatically.");
+    }
+  } catch (error) {
+    console.error("Failed to ensure SMTR group:", error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
+
+  // Ensure SMTR team group exists in the database
+  await ensureSmtrGroup();
   
   // Debug endpoint to test task serialization
   app.get("/api/debug/tasks-sample", async (req, res) => {
