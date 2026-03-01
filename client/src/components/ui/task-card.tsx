@@ -2,7 +2,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapPin, Clock, AlertTriangle, CheckCircle, CheckCircle2, Image } from "lucide-react";
+import { MapPin, Clock, AlertTriangle, CheckCircle, CheckCircle2, Image, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Task, PRIORITIES } from "@/lib/mockData";
 import { formatDistanceToNow } from "date-fns";
@@ -19,9 +19,10 @@ interface TaskCardProps {
   isSelected?: boolean;
   onSelect?: (taskId: string) => void;
   onMarkResolved?: (taskId: string) => void;
+  onSendToSmtr?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, onClick, locations = [], users = [], maintenanceGroups = [], selectionMode = false, isSelected = false, onSelect, onMarkResolved }: TaskCardProps) {
+export function TaskCard({ task, onClick, locations = [], users = [], maintenanceGroups = [], selectionMode = false, isSelected = false, onSelect, onMarkResolved, onSendToSmtr }: TaskCardProps) {
   const priorityConfig = PRIORITIES[task.priority];
   const location = locations.find(l => l.id === task.locationId);
   const assignedUser = users.find(u => u.id === task.assignedTo);
@@ -143,6 +144,21 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
             )}
           </div>
           <div className="flex items-center gap-2">
+            {onSendToSmtr && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-amber-600 hover:bg-amber-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendToSmtr(task.id);
+                }}
+                title="Send to SMTR"
+                data-testid={`button-smtr-card-${task.id}`}
+              >
+                <Wrench className="h-4 w-4" />
+              </Button>
+            )}
             {task.status !== "Resolved" && onMarkResolved && (
               <Button
                 variant="ghost"

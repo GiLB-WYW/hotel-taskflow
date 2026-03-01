@@ -5,7 +5,7 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X, CheckCircle2 } from "lucide-react";
+import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X, CheckCircle2, Wrench } from "lucide-react";
 import jsPDF from "jspdf";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
@@ -36,6 +36,22 @@ export default function Dashboard() {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const sendToSmtrMutation = useMutation({
+    mutationFn: async ({ taskId, groupId }: { taskId: string; groupId: string }) => {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedGroup: groupId }),
+      });
+      if (!res.ok) throw new Error("Failed to reassign task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Sent to SMTR", description: "Task has been reassigned to the SMTR team." });
+    },
+  });
 
   const markResolvedMutation = useMutation({
     mutationFn: async (taskId: string) => {
@@ -720,6 +736,7 @@ export default function Dashboard() {
                     isSelected={selectedTasks.has(task.id)}
                     onSelect={toggleTaskSelection}
                     onMarkResolved={(id) => markResolvedMutation.mutate(id)}
+                    onSendToSmtr={currentUser?.role === "Admin" && smtrGroup ? (id) => sendToSmtrMutation.mutate({ taskId: id, groupId: smtrGroup.id }) : undefined}
                   />
                 );
               })}
@@ -792,6 +809,21 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
+                    {currentUser?.role === "Admin" && smtrGroup && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-amber-600 hover:bg-amber-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sendToSmtrMutation.mutate({ taskId: task.id, groupId: smtrGroup.id });
+                        }}
+                        title="Send to SMTR"
+                        data-testid={`button-smtr-list-${task.id}`}
+                      >
+                        <Wrench className="h-5 w-5" />
+                      </Button>
+                    )}
                     {task.status !== "Resolved" && (
                       <Button
                         variant="ghost"
