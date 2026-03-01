@@ -54,7 +54,8 @@ export const tasksTable = pgTable("tasks", {
   priority: varchar("priority").notNull(), // Red Flag, High, Normal, Low
   status: varchar("status").notNull().default("Open"), // Open, In Progress, Resolved
   assignedTo: varchar("assigned_to"), // User ID
-  assignedGroup: varchar("assigned_group"), // Maintenance group ID
+  assignedGroup: varchar("assigned_group"), // Legacy single group ID (kept for backward compat)
+  assignedGroups: text("assigned_groups").array(), // Array of maintenance group IDs
   createdBy: varchar("created_by").notNull(), // User ID
   imageUrl: text("image_url"),
   attachmentUrl: text("attachment_url"), // Uploaded file attachment

@@ -76,7 +76,8 @@ export default function SmtrPage() {
   const smtrGroup = maintenanceGroups.find(g => g.name === "SMTR team");
 
   const tasks = allTasks.filter(task => {
-    return task.assignedGroup === smtrGroup?.id || task.assignedGroup === "SMTR team";
+    const groups = task.assignedGroups || (task.assignedGroup ? [task.assignedGroup] : []);
+    return (smtrGroup ? groups.includes(smtrGroup.id) : false) || groups.includes("SMTR team");
   });
 
   const resolvedCount = tasks.filter(t => t.status === "Resolved").length;

@@ -90,6 +90,7 @@ export interface IStorage {
     locationId?: string;
     status?: string;
     assignedGroup?: string;
+    assignedGroups?: string;
     startDate?: Date;
     endDate?: Date;
   }): Promise<Task[]>;
@@ -316,6 +317,7 @@ export class PostgresStorage implements IStorage {
     locationId?: string;
     status?: string;
     assignedGroup?: string;
+    assignedGroups?: string;
     startDate?: Date;
     endDate?: Date;
   }): Promise<Task[]> {
@@ -328,6 +330,9 @@ export class PostgresStorage implements IStorage {
     }
     if (filters?.assignedGroup) {
       conditions.push(eq(tasksTable.assignedGroup, filters.assignedGroup));
+    }
+    if (filters?.assignedGroups) {
+      conditions.push(sql`${filters.assignedGroups} = ANY(${tasksTable.assignedGroups})`);
     }
     if (filters?.startDate) {
       conditions.push(gte(tasksTable.createdAt, filters.startDate));

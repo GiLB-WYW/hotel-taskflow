@@ -148,8 +148,9 @@ export default function TaskDetail() {
     let matchesGroup = true;
     if (groupFilter) {
       const selectedGroup = maintenanceGroups.find(g => g.id === groupFilter);
-      matchesGroup = taskItem.assignedGroup === groupFilter || 
-        (selectedGroup ? taskItem.assignedGroup === selectedGroup.name : false);
+      const groups = taskItem.assignedGroups || (taskItem.assignedGroup ? [taskItem.assignedGroup] : []);
+      matchesGroup = groups.includes(groupFilter) || 
+        (selectedGroup ? groups.includes(selectedGroup.name) : false);
     }
     
     return matchesStatus && matchesPriority && matchesLocationCategory && matchesUser && matchesGroup;
@@ -367,14 +368,22 @@ export default function TaskDetail() {
     }
   };
 
-  const handleChangeGroup = async (groupId: string) => {
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+
+  const handleChangeGroups = async () => {
     try {
-      await updateTaskMutation.mutateAsync({ assignedGroup: groupId });
+      await updateTaskMutation.mutateAsync({ assignedGroups: selectedGroups, assignedGroup: selectedGroups[0] || null });
       setIsChangeGroupDialogOpen(false);
-      toast({ title: "Success", description: "Assigned group updated." });
+      toast({ title: "Success", description: "Assigned groups updated." });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update assigned group.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update assigned groups.", variant: "destructive" });
     }
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroups(prev =>
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+    );
   };
 
   const handleOpenEditDialog = () => {
@@ -429,8 +438,11 @@ export default function TaskDetail() {
   const creator = users.find(u => u.id === task.createdBy);
   const assignee = users.find(u => u.id === task.assignedTo);
   const priorityConfig = PRIORITIES[task.priority];
-  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
-  const assignedGroupName = assignedGroup?.name || task.assignedGroup || "General";
+  const taskGroups = (task.assignedGroups || (task.assignedGroup ? [task.assignedGroup] : []));
+  const assignedGroupsList = taskGroups
+    .map(gId => maintenanceGroups.find(g => g.id === gId || g.name === gId))
+    .filter(Boolean) as typeof maintenanceGroups;
+  const assignedGroupName = assignedGroupsList.map(g => g.name).join(", ") || "Unassigned";
 
   const exportPDF = async () => {
     setIsExporting(true);
@@ -611,7 +623,7 @@ export default function TaskDetail() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 <div>
-                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assigned Group</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assigned Groups</p>
                   <p style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>{assignedGroupName}</p>
                 </div>
                 <div>
@@ -800,14 +812,26 @@ export default function TaskDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium mb-2">Assigned Group</p>
+                  <p className="text-sm font-medium mb-2">Assigned Groups</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {assignedGroupsList.length > 0 ? assignedGroupsList.map(g => (
+                      <Badge key={g.id} className="text-xs bg-primary/10 text-primary border-primary/20">
+                        {g.name}
+                      </Badge>
+                    )) : (
+                      <span className="text-sm text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
                   <Button
                     variant="secondary"
                     className="text-sm w-full justify-center py-2 cursor-pointer hover:bg-secondary/80"
-                    onClick={() => setIsChangeGroupDialogOpen(true)}
+                    onClick={() => {
+                      setSelectedGroups(taskGroups);
+                      setIsChangeGroupDialogOpen(true);
+                    }}
                     data-testid="button-change-group"
                   >
-                    {assignedGroupName}
+                    Change Groups
                   </Button>
                 </div>
                 <div>
@@ -975,25 +999,32 @@ export default function TaskDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Change Assigned Group Dialog */}
+      {/* Change Assigned Groups Dialog */}
       <Dialog open={isChangeGroupDialogOpen} onOpenChange={setIsChangeGroupDialogOpen}>
         <DialogContent data-testid="dialog-change-group">
           <DialogHeader>
-            <DialogTitle>Change Assigned Group</DialogTitle>
+            <DialogTitle>Change Assigned Groups</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Select onValueChange={handleChangeGroup}>
-              <SelectTrigger data-testid="select-group">
-                <SelectValue placeholder="Select a maintenance group" />
-              </SelectTrigger>
-              <SelectContent>
-                {maintenanceGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id} data-testid={`option-group-${group.id}`}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-3 py-4 max-h-[400px] overflow-y-auto">
+            {maintenanceGroups.map((group) => (
+              <label
+                key={group.id}
+                className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                data-testid={`checkbox-group-${group.id}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedGroups.includes(group.id)}
+                  onChange={() => toggleGroupSelection(group.id)}
+                  className="h-4 w-4 rounded border-gray-300 accent-primary"
+                />
+                <span className="text-sm font-medium">{group.name}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsChangeGroupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleChangeGroups} disabled={selectedGroups.length === 0} data-testid="button-save-groups">Save</Button>
           </div>
         </DialogContent>
       </Dialog>

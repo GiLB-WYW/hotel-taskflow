@@ -42,7 +42,7 @@ export default function Dashboard() {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedGroup: groupId }),
+        body: JSON.stringify({ assignedGroups: [groupId], assignedGroup: groupId }),
       });
       if (!res.ok) throw new Error("Failed to reassign task");
       return res.json();
@@ -120,7 +120,8 @@ export default function Dashboard() {
   // Filter tasks based on user role
   const tasks = allTasks.filter(task => {
     // Hide SMTR tasks from the main dashboard (they have their own page)
-    if (smtrGroup && (task.assignedGroup === smtrGroup.id || task.assignedGroup === "SMTR team")) {
+    const groups = task.assignedGroups || (task.assignedGroup ? [task.assignedGroup] : []);
+    if (smtrGroup && (groups.includes(smtrGroup.id) || groups.includes("SMTR team"))) {
       return false;
     }
 
@@ -129,7 +130,7 @@ export default function Dashboard() {
     if (currentUser.role === "Admin") return true;
     
     if (currentUser.role === "Manager" && currentUser.group) {
-      return task.assignedGroup === currentUser.group;
+      return groups.includes(currentUser.group);
     }
     
     if (currentUser.role === "Personnel" || currentUser.role === "Basic Staff") {
@@ -189,9 +190,10 @@ export default function Dashboard() {
     // Match by maintenance group (check both ID and name for backwards compatibility)
     let matchesGroup = true;
     if (groupFilter !== "All") {
+      const groups = task.assignedGroups || (task.assignedGroup ? [task.assignedGroup] : []);
       const selectedGroup = maintenanceGroups.find(g => g.id === groupFilter);
-      matchesGroup = task.assignedGroup === groupFilter || 
-        (selectedGroup ? task.assignedGroup === selectedGroup.name : false);
+      matchesGroup = groups.includes(groupFilter) || 
+        (selectedGroup ? groups.includes(selectedGroup.name) : false);
     }
     
     return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesLocation && matchesUser && matchesGroup;

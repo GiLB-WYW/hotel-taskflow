@@ -46,7 +46,7 @@ export default function CreateTask() {
     originalTranscript: "",
     priority: "Normal",
     locationId: "",
-    assignedGroup: "",
+    assignedGroups: [] as string[],
   });
 
   // File upload and URL state
@@ -314,7 +314,7 @@ export default function CreateTask() {
         originalTranscript: inputText,
         priority: data.priority || "Normal",
         locationId: data.locationId || "",
-        assignedGroup: data.assignedGroup || "",
+        assignedGroups: data.assignedGroups || (data.assignedGroup ? [data.assignedGroup] : []),
       });
       
       setIsProcessing(false);
@@ -357,7 +357,8 @@ export default function CreateTask() {
           originalTranscript: formData.originalTranscript,
           locationId: formData.locationId,
           priority: formData.priority,
-          assignedGroup: formData.assignedGroup,
+          assignedGroups: formData.assignedGroups,
+          assignedGroup: formData.assignedGroups[0] || "",
           imageUrl: photo,
           attachmentUrl: attachmentUrl || undefined,
           linkUrl: linkUrl.trim() || undefined,
@@ -614,16 +615,25 @@ export default function CreateTask() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Who Needs to Fix It?</label>
-                  <select 
-                    className="w-full p-2 bg-background rounded-md border border-border font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-                    value={formData.assignedGroup}
-                    onChange={(e) => setFormData({...formData, assignedGroup: e.target.value})}
-                  >
-                    <option value="">-- Select Group --</option>
+                  <div className="space-y-2 p-2 bg-background rounded-md border border-border">
                     {maintenanceGroups.map(g => (
-                      <option key={g.id} value={g.name}>{g.name} • {g.memberCount} members</option>
+                      <label key={g.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer" data-testid={`checkbox-create-group-${g.id}`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.assignedGroups.includes(g.id)}
+                          onChange={() => {
+                            const newGroups = formData.assignedGroups.includes(g.id)
+                              ? formData.assignedGroups.filter(id => id !== g.id)
+                              : [...formData.assignedGroups, g.id];
+                            setFormData({...formData, assignedGroups: newGroups});
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 accent-primary"
+                        />
+                        <span className="text-sm font-medium">{g.name}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{g.memberCount} members</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">

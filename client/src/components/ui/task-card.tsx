@@ -26,7 +26,10 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
   const priorityConfig = PRIORITIES[task.priority];
   const location = locations.find(l => l.id === task.locationId);
   const assignedUser = users.find(u => u.id === task.assignedTo);
-  const assignedGroup = maintenanceGroups.find(g => g.id === task.assignedGroup || g.name === task.assignedGroup);
+  const taskGroups = (task.assignedGroups || (task.assignedGroup ? [task.assignedGroup] : []));
+  const assignedGroupsList = taskGroups
+    .map(gId => maintenanceGroups.find(g => g.id === gId || g.name === gId))
+    .filter(Boolean) as typeof maintenanceGroups;
   
   const isResolved = task.status === 'Resolved';
   
@@ -180,10 +183,14 @@ export function TaskCard({ task, onClick, locations = [], users = [], maintenanc
             </div>
           </div>
         </div>
-        {assignedGroup && (
-          <Badge className="w-fit text-[10px] h-5 px-2 font-medium bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-            {assignedGroup.name}
-          </Badge>
+        {assignedGroupsList.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {assignedGroupsList.map(g => (
+              <Badge key={g.id} className="w-fit text-[10px] h-5 px-2 font-medium bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                {g.name}
+              </Badge>
+            ))}
+          </div>
         )}
       </CardFooter>
     </Card>
