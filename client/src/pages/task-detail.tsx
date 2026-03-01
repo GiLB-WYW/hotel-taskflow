@@ -163,11 +163,28 @@ export default function TaskDetail() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Find current task index and adjacent tasks (loop around for infinite swiping)
-  const currentIndex = sortedTasks.findIndex(t => t.id === params?.id);
-  const tasksCount = sortedTasks.length;
-  const prevTask = tasksCount > 0 ? sortedTasks[(currentIndex - 1 + tasksCount) % tasksCount] : null;
-  const nextTask = tasksCount > 0 ? sortedTasks[(currentIndex + 1) % tasksCount] : null;
+  // Ensure current task is always in the navigation list for circular swiping
+  const navTasks = (() => {
+    const inList = sortedTasks.some(t => t.id === params?.id);
+    if (inList) return sortedTasks;
+    const currentTask = allTasks.find(t => t.id === params?.id);
+    if (!currentTask) return sortedTasks;
+    const currentIdx = sortedTasks.findIndex(t => {
+      const priorityOrder: Record<string, number> = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
+      const cmpPriority = (priorityOrder[currentTask.priority] ?? 4) - (priorityOrder[t.priority] ?? 4);
+      if (cmpPriority !== 0) return cmpPriority > 0;
+      return new Date(currentTask.createdAt).getTime() < new Date(t.createdAt).getTime();
+    });
+    const inserted = [...sortedTasks];
+    inserted.splice(currentIdx === -1 ? inserted.length : currentIdx, 0, currentTask);
+    return inserted;
+  })();
+
+  // Find current task index and adjacent tasks (closed circle - no beginning or end)
+  const currentIndex = navTasks.findIndex(t => t.id === params?.id);
+  const tasksCount = navTasks.length;
+  const prevTask = tasksCount > 1 ? navTasks[(currentIndex - 1 + tasksCount) % tasksCount] : null;
+  const nextTask = tasksCount > 1 ? navTasks[(currentIndex + 1) % tasksCount] : null;
 
   // Navigation functions (preserve filter params)
   const goToPrevTask = useCallback(() => {
@@ -199,9 +216,9 @@ export default function TaskDetail() {
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
     
-    if (isLeftSwipe && nextTask) {
+    if (isLeftSwipe) {
       goToNextTask();
-    } else if (isRightSwipe && prevTask) {
+    } else if (isRightSwipe) {
       goToPrevTask();
     }
     
@@ -212,16 +229,16 @@ export default function TaskDetail() {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" && prevTask) {
+      if (e.key === "ArrowLeft") {
         goToPrevTask();
-      } else if (e.key === "ArrowRight" && nextTask) {
+      } else if (e.key === "ArrowRight") {
         goToNextTask();
       }
     };
     
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [prevTask, nextTask, goToPrevTask, goToNextTask]);
+  }, [goToPrevTask, goToNextTask]);
 
   // Mutation to update task
   const updateTaskMutation = useMutation({
@@ -242,11 +259,11 @@ export default function TaskDetail() {
 
   // Mutation to mark task as resolved
   const getNextTaskAfterRemoval = () => {
-    if (sortedTasks.length <= 1) return null;
-    const idx = sortedTasks.findIndex(t => t.id === params?.id);
+    if (navTasks.length <= 1) return null;
+    const idx = navTasks.findIndex(t => t.id === params?.id);
     if (idx === -1) return null;
-    const nextIdx = idx < sortedTasks.length - 1 ? idx + 1 : idx - 1;
-    return sortedTasks[nextIdx];
+    const nextIdx = (idx + 1) % navTasks.length;
+    return navTasks[nextIdx].id === params?.id ? null : navTasks[nextIdx];
   };
 
   const markResolvedMutation = useMutation({
@@ -505,9 +522,8 @@ export default function TaskDetail() {
         onTouchEnd={handleTouchEnd}
       >
         {/* Task Navigation Arrows - Visible on desktop, hidden on mobile (mobile uses swipe) */}
-        {sortedTasks.length > 1 && (
+        {navTasks.length > 1 && (
           <>
-            {/* Previous Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToPrevTask}
               className="hidden md:flex absolute -left-16 lg:-left-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30"
@@ -517,7 +533,6 @@ export default function TaskDetail() {
               <ChevronLeft className="h-6 w-6" />
             </button>
             
-            {/* Next Task Arrow - Desktop only, positioned relative to content */}
             <button
               onClick={goToNextTask}
               className="hidden md:flex absolute -right-16 lg:-right-20 top-1/3 z-40 h-12 w-12 rounded-full bg-background border-2 shadow-lg items-center justify-center transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer border-primary/30"
@@ -530,11 +545,11 @@ export default function TaskDetail() {
         )}
 
         {/* Task Counter */}
-        {sortedTasks.length > 1 && currentIndex >= 0 && (
+        {navTasks.length > 1 && currentIndex >= 0 && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-sm border rounded-full px-4 py-2 shadow-lg text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{currentIndex + 1}</span>
             <span> of </span>
-            <span className="font-semibold text-foreground">{sortedTasks.length}</span>
+            <span className="font-semibold text-foreground">{navTasks.length}</span>
             <span className="ml-2 text-xs md:hidden">↻ Swipe to navigate</span>
             <span className="ml-2 text-xs hidden md:inline">↻ Use arrows or keyboard</span>
           </div>
