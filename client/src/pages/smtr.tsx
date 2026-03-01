@@ -5,10 +5,10 @@ import { Task, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RotateCcw, AlertTriangle, Plus, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X, CheckCircle2 } from "lucide-react";
+import { Search, RotateCcw, AlertTriangle, Users, MapPin, Check, ChevronsUpDown, LayoutGrid, List, Download, CheckSquare, X, CheckCircle2, Wrench } from "lucide-react";
 import jsPDF from "jspdf";
 import { Badge } from "@/components/ui/badge";
-import { useLocation, useSearch } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Category, Location as LocationType, User as DbUser, MaintenanceGroup } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,26 +16,24 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import { PRIORITIES } from "@/lib/mockData";
 
-export default function Dashboard() {
-  const searchParams = useSearch();
-  const urlParams = new URLSearchParams(searchParams);
+export default function SmtrPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState(urlParams.get("status") || "All");
-  const [priorityFilter, setPriorityFilter] = useState(urlParams.get("priority") || "All");
-  const [locationCategoryFilter, setLocationCategoryFilter] = useState(urlParams.get("location") || "All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [locationCategoryFilter, setLocationCategoryFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
   const [locationSearchOpen, setLocationSearchOpen] = useState(false);
-  const [userFilter, setUserFilter] = useState(urlParams.get("user") || "All");
-  const [groupFilter, setGroupFilter] = useState(urlParams.get("group") || "All");
+  const [userFilter, setUserFilter] = useState("All");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const markResolvedMutation = useMutation({
     mutationFn: async (taskId: string) => {
@@ -52,144 +50,80 @@ export default function Dashboard() {
       toast({ title: "Task Resolved", description: "Task has been marked as resolved." });
     },
   });
-  
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    setPriorityFilter(params.get("priority") || "All");
-    setUserFilter(params.get("user") || "All");
-    setStatusFilter(params.get("status") || "All");
-    setLocationCategoryFilter(params.get("location") || "All");
-    setGroupFilter(params.get("group") || "All");
-  }, [searchParams]);
 
-  // Fetch categories (buildings) from API
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
 
-  // Fetch locations from API
   const { data: locations = [] } = useQuery<LocationType[]>({
     queryKey: ["/api/locations"],
   });
 
-  // Fetch users from API for the user filter dropdown
   const { data: allUsers = [] } = useQuery<DbUser[]>({
     queryKey: ["/api/users"],
   });
 
-  // Fetch maintenance groups from API
   const { data: maintenanceGroups = [] } = useQuery<MaintenanceGroup[]>({
     queryKey: ["/api/maintenance-groups"],
   });
 
-  // Get building names for the filter dropdown
   const locationCategories = categories.map(cat => cat.name);
 
-  // Get current user from localStorage
-  useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const userData = JSON.parse(userStr);
-      setCurrentUser(userData as User);
-    }
-  }, []);
-
-  // Fetch tasks from API
   const { data: allTasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
   });
 
   const smtrGroup = maintenanceGroups.find(g => g.name === "SMTR team");
 
-  // Filter tasks based on user role
   const tasks = allTasks.filter(task => {
-    // Hide SMTR tasks from the main dashboard (they have their own page)
-    if (smtrGroup && (task.assignedGroup === smtrGroup.id || task.assignedGroup === "SMTR team")) {
-      return false;
-    }
-
-    if (!currentUser) return true;
-    
-    if (currentUser.role === "Admin") return true;
-    
-    if (currentUser.role === "Manager" && currentUser.group) {
-      return task.assignedGroup === currentUser.group;
-    }
-    
-    if (currentUser.role === "Personnel" || currentUser.role === "Basic Staff") {
-      return task.createdBy === currentUser.id || task.assignedTo === currentUser.id;
-    }
-    
-    return true;
+    return task.assignedGroup === smtrGroup?.id || task.assignedGroup === "SMTR team";
   });
 
-  // Calculate resolved count dynamically
   const resolvedCount = tasks.filter(t => t.status === "Resolved").length;
 
-  // Filter Logic with Smart Search
   const filteredTasks = tasks.filter(task => {
     const searchLower = searchQuery.toLowerCase();
     const location = locations.find(l => l.id === task.locationId);
-    
-    // Smart search: match title, description, location name, location code
-    const matchesSearch = 
-      task.title.toLowerCase().includes(searchLower) || 
+
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchLower) ||
       task.description.toLowerCase().includes(searchLower) ||
       (location?.name.toLowerCase().includes(searchLower)) ||
       (location?.id.toLowerCase().includes(searchLower)) ||
-      // Also match just the room/location code (e.g., "C2" from "Suite C2")
       (location?.name.split(/\s+/).some(word => word.toLowerCase().includes(searchLower)));
-    
-    // By default, hide resolved tasks unless explicitly filtering for them
+
     let matchesStatus = true;
     if (statusFilter === "All") {
-      // When "All" is selected, hide resolved tasks from the main list
       matchesStatus = task.status !== "Resolved";
     } else {
       matchesStatus = task.status === statusFilter;
     }
-    
+
     const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
-    
-    // Match by location category (e.g., "Suites B", "Restaurant", etc.)
+
     let matchesLocationCategory = true;
     if (locationCategoryFilter !== "All") {
       const taskLocation = locations.find(l => l.id === task.locationId);
       matchesLocationCategory = taskLocation?.category === locationCategoryFilter;
     }
 
-    // Match by specific location
     let matchesLocation = true;
     if (locationFilter !== "All") {
       matchesLocation = task.locationId === locationFilter;
     }
 
-    // Match by user (assigned to only)
     let matchesUser = true;
     if (userFilter !== "All") {
       matchesUser = task.assignedTo === userFilter;
     }
 
-    // Match by maintenance group (check both ID and name for backwards compatibility)
-    let matchesGroup = true;
-    if (groupFilter !== "All") {
-      const selectedGroup = maintenanceGroups.find(g => g.id === groupFilter);
-      matchesGroup = task.assignedGroup === groupFilter || 
-        (selectedGroup ? task.assignedGroup === selectedGroup.name : false);
-    }
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesLocation && matchesUser && matchesGroup;
+    return matchesSearch && matchesStatus && matchesPriority && matchesLocationCategory && matchesLocation && matchesUser;
   });
 
-  // Sort by Priority (Red Flag first), then by creation date (newest first)
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    const priorityOrder = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
-    const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-    
-    if (priorityDiff !== 0) {
-      return priorityDiff;
-    }
-    
+    const priorityOrder: Record<string, number> = { "Red Flag": 0, "High": 1, "Normal": 2, "Low": 3 };
+    const priorityDiff = (priorityOrder[a.priority] ?? 4) - (priorityOrder[b.priority] ?? 4);
+    if (priorityDiff !== 0) return priorityDiff;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -225,10 +159,10 @@ export default function Dashboard() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
-    
+
     const imageCache: Record<string, string> = {};
     const tasksWithImages = exportTasks.filter(t => (t as any).hasImage || (t.imageUrl && t.imageUrl !== 'HAS_IMAGE'));
-    
+
     await Promise.all(tasksWithImages.map(async (task) => {
       try {
         const response = await fetch(`/api/tasks/${task.id}/thumbnail`);
@@ -245,70 +179,47 @@ export default function Dashboard() {
         console.log("Failed to load thumbnail for task:", task.id);
       }
     }));
-    
+
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("Task List", pageWidth / 2, yPos, { align: "center" });
+    doc.text("SMTR Team - Task List", pageWidth / 2, yPos, { align: "center" });
     yPos += 10;
-    
+
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const dateStr = new Date().toLocaleDateString("fr-FR", { 
-      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" 
+    const dateStr = new Date().toLocaleDateString("fr-FR", {
+      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
     });
     doc.text(`Generated: ${dateStr}`, pageWidth / 2, yPos, { align: "center" });
     yPos += 5;
-    
-    const activeFilters = [];
-    if (statusFilter !== "All") activeFilters.push(`Status: ${statusFilter}`);
-    if (priorityFilter !== "All") activeFilters.push(`Priority: ${priorityFilter}`);
-    if (locationCategoryFilter !== "All") activeFilters.push(`Building: ${locationCategoryFilter}`);
-    if (locationFilter !== "All") {
-      const loc = locations.find(l => l.id === locationFilter);
-      activeFilters.push(`Location: ${loc?.name || locationFilter}`);
-    }
-    if (userFilter !== "All") {
-      const user = allUsers.find(u => u.id === userFilter);
-      activeFilters.push(`Assigned: ${user?.name || userFilter}`);
-    }
-    if (groupFilter !== "All") {
-      const group = maintenanceGroups.find(g => g.id === groupFilter);
-      activeFilters.push(`Group: ${group?.name || groupFilter}`);
-    }
-    if (activeFilters.length > 0) {
-      doc.text(`Filters: ${activeFilters.join(" | ")}`, pageWidth / 2, yPos, { align: "center" });
-      yPos += 5;
-    }
-    
+
     doc.text(`Total: ${exportTasks.length} tasks`, pageWidth / 2, yPos, { align: "center" });
     yPos += 15;
-    
+
     doc.setDrawColor(200);
     doc.line(15, yPos - 5, pageWidth - 15, yPos - 5);
-    
+
     const thumbnailSize = 20;
-    
+
     exportTasks.forEach((task, index) => {
       const hasImage = imageCache[task.id];
       const rowHeight = thumbnailSize + 6;
-      
+
       if (yPos + rowHeight > 280) {
         doc.addPage();
         yPos = 20;
       }
-      
+
       const location = locations.find(l => l.id === task.locationId);
       const assignedUser = allUsers.find(u => u.id === task.assignedTo);
-      
+
       const thumbnailX = pageWidth - 15 - thumbnailSize;
       const thumbnailY = yPos - 2;
-      
-      // Always draw a square placeholder
+
       doc.setDrawColor(180);
       doc.setFillColor(245, 245, 245);
       doc.rect(thumbnailX, thumbnailY, thumbnailSize, thumbnailSize, 'FD');
-      
-      // Add thumbnail image if available
+
       if (hasImage) {
         try {
           doc.addImage(imageCache[task.id], 'JPEG', thumbnailX, thumbnailY, thumbnailSize, thumbnailSize);
@@ -316,7 +227,7 @@ export default function Dashboard() {
           console.log("Failed to add image to PDF");
         }
       }
-      
+
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       const priorityLabel = `[${task.priority}]`;
@@ -324,78 +235,73 @@ export default function Dashboard() {
       const titleText = `${index + 1}. ${priorityLabel} ${task.title}${statusLabel}`;
       doc.text(titleText.substring(0, 60) + (titleText.length > 60 ? "..." : ""), 15, yPos);
       yPos += 5;
-      
+
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
       doc.text(`   Location: ${location?.name || "Unknown"} | Status: ${task.status}`, 15, yPos);
       yPos += 4;
-      
+
       if (assignedUser) {
         doc.text(`   Assigned to: ${assignedUser.name}`, 15, yPos);
         yPos += 4;
       }
-      
+
       if (task.description) {
         const desc = task.description.length > 70 ? task.description.substring(0, 70) + "..." : task.description;
         doc.text(`   ${desc}`, 15, yPos);
         yPos += 4;
       }
-      
+
       doc.setTextColor(0);
       yPos += 8;
     });
-    
-    doc.save(`task-list-${new Date().toISOString().split("T")[0]}.pdf`);
+
+    doc.save(`smtr-tasks-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   if (isLoading) {
     return (
-      <Layout>
+      <Layout userRole="Admin">
         <div className="flex items-center justify-center min-h-[400px]">
-          <p className="text-muted-foreground">Loading tasks...</p>
+          <p className="text-muted-foreground">Loading SMTR tasks...</p>
         </div>
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout userRole="Admin">
       <div className="space-y-4 sm:space-y-6 pb-32 w-full overflow-x-hidden">
-        {/* Welcome Message */}
-        {currentUser && (
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 sm:p-6">
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary">
-              Welcome, {currentUser.name}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {currentUser.role === "Admin" && "Viewing all tasks in the system"}
-              {currentUser.role === "Manager" && `Viewing all tasks for ${currentUser.group}`}
-              {(currentUser.role === "Personnel" || currentUser.role === "Basic Staff") && "Viewing your assigned tasks"}
-            </p>
+        <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-xl p-4 sm:p-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <Wrench className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-amber-700" data-testid="text-smtr-title">
+                SMTR Team
+              </h1>
+              <p className="text-muted-foreground mt-0.5">
+                All tasks assigned to the SMTR maintenance team
+              </p>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Stats Overview - Clickable Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-          <div 
+          <div
             className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${statusFilter === "Open" ? 'border-primary bg-primary/5' : 'border-border'}`}
-            onClick={() => {
-              if (statusFilter === "Open") {
-                setStatusFilter("All");
-              } else {
-                setStatusFilter("Open");
-              }
-            }}
-            data-testid="card-open-tasks"
+            onClick={() => setStatusFilter(statusFilter === "Open" ? "All" : "Open")}
+            data-testid="card-smtr-open"
           >
-            <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open Tasks</p>
+            <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Open</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
               <span className="text-2xl sm:text-3xl font-bold text-primary">{tasks.filter(t => t.status === "Open").length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">tasks</span>
             </div>
           </div>
-          <div 
+          <div
             className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${priorityFilter === "Red Flag" ? 'border-red-500 bg-red-100/70 ring-2 ring-red-300' : 'border-red-200 bg-red-50/50'}`}
             onClick={() => {
               if (priorityFilter === "Red Flag") {
@@ -405,7 +311,7 @@ export default function Dashboard() {
                 setStatusFilter("All");
               }
             }}
-            data-testid="card-critical"
+            data-testid="card-smtr-critical"
           >
             <div className="flex items-center justify-between">
               <p className="text-red-700/80 text-[10px] sm:text-xs font-medium uppercase tracking-wider">Critical</p>
@@ -416,16 +322,10 @@ export default function Dashboard() {
               <span className="text-[10px] sm:text-xs text-red-600/80">needs attention</span>
             </div>
           </div>
-          <div 
+          <div
             className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${statusFilter === "In Progress" ? 'border-blue-400 bg-blue-50/50' : 'border-border'}`}
-            onClick={() => {
-              if (statusFilter === "In Progress") {
-                setStatusFilter("All");
-              } else {
-                setStatusFilter("In Progress");
-              }
-            }}
-            data-testid="card-in-progress"
+            onClick={() => setStatusFilter(statusFilter === "In Progress" ? "All" : "In Progress")}
+            data-testid="card-smtr-in-progress"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">In Progress</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
@@ -433,16 +333,10 @@ export default function Dashboard() {
               <span className="text-[10px] sm:text-xs text-muted-foreground">active</span>
             </div>
           </div>
-          <div 
+          <div
             className={`bg-card border rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all ${statusFilter === "Resolved" ? 'border-green-400 bg-green-50/50' : 'border-border'}`}
-            onClick={() => {
-              if (statusFilter === "Resolved") {
-                setStatusFilter("All");
-              } else {
-                setStatusFilter("Resolved");
-              }
-            }}
-            data-testid="card-resolved"
+            onClick={() => setStatusFilter(statusFilter === "Resolved" ? "All" : "Resolved")}
+            data-testid="card-smtr-resolved"
           >
             <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider">Resolved</p>
             <div className="mt-2 flex items-baseline gap-1 sm:gap-2">
@@ -452,19 +346,19 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center bg-card p-3 rounded-lg border border-border shadow-sm">
           <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search tasks..." 
+            <Input
+              placeholder="Search SMTR tasks..."
               className="pl-9 bg-background h-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-smtr-search"
             />
           </div>
           <div className="flex gap-1 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 flex-shrink-0 scrollbar-thin" style={{ WebkitOverflowScrolling: "touch" }}>
-             <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-28 sm:w-32 bg-background text-sm flex-shrink-0">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -575,23 +469,9 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger className="w-32 sm:w-40 bg-background text-sm flex-shrink-0" data-testid="select-group-filter">
-                <SelectValue placeholder="Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Groups</SelectItem>
-                {maintenanceGroups.map(group => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="text-muted-foreground h-10 w-10 flex-shrink-0 hover:text-primary"
               onClick={() => {
                 setSearchQuery("");
@@ -600,21 +480,19 @@ export default function Dashboard() {
                 setUserFilter("All");
                 setLocationCategoryFilter("All");
                 setLocationFilter("All");
-                setGroupFilter("All");
               }}
               title="Reset all filters"
-              data-testid="button-reset-filters"
+              data-testid="button-smtr-reset-filters"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Task Grid */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-serif font-semibold flex items-center gap-2">
-              Tasks
+              SMTR Tasks
               <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-xs">
                 {sortedTasks.length}
               </Badge>
@@ -627,7 +505,7 @@ export default function Dashboard() {
                 onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
                 title={selectionMode ? "Cancel selection" : "Select tasks"}
                 disabled={sortedTasks.length === 0}
-                data-testid="button-toggle-selection"
+                data-testid="button-smtr-toggle-selection"
               >
                 {selectionMode ? <X className="h-4 w-4" /> : <CheckSquare className="h-4 w-4" />}
                 <span className="hidden sm:inline">{selectionMode ? "Cancel" : "Select"}</span>
@@ -646,7 +524,7 @@ export default function Dashboard() {
                 }}
                 title={selectionMode && selectedTasks.size > 0 ? `Export ${selectedTasks.size} selected as PDF` : "Download all as PDF"}
                 disabled={sortedTasks.length === 0 || (selectionMode && selectedTasks.size === 0)}
-                data-testid="button-download-pdf"
+                data-testid="button-smtr-download-pdf"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">
@@ -675,7 +553,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
+
           {selectionMode && sortedTasks.length > 0 && (
             <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
               <Button
@@ -683,7 +561,7 @@ export default function Dashboard() {
                 size="sm"
                 className="h-7 text-xs gap-1.5"
                 onClick={toggleSelectAll}
-                data-testid="button-select-all"
+                data-testid="button-smtr-select-all"
               >
                 <CheckSquare className="h-3.5 w-3.5" />
                 {selectedTasks.size === sortedTasks.length ? "Deselect all" : "Select all"}
@@ -693,164 +571,121 @@ export default function Dashboard() {
               </span>
             </div>
           )}
-          
+
           {sortedTasks.length > 0 ? (
             viewMode === "cards" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {sortedTasks.map(task => {
-                // Build filter query string to preserve context when navigating to task
-                const filterParams = new URLSearchParams();
-                if (statusFilter !== "All") filterParams.set("status", statusFilter);
-                if (priorityFilter !== "All") filterParams.set("priority", priorityFilter);
-                if (locationCategoryFilter !== "All") filterParams.set("location", locationCategoryFilter);
-                if (userFilter !== "All") filterParams.set("user", userFilter);
-                if (groupFilter !== "All") filterParams.set("group", groupFilter);
-                const queryString = filterParams.toString();
-                const taskUrl = `/task/${task.id}${queryString ? `?${queryString}` : ""}`;
-                
-                return (
-                  <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    onClick={() => setLocation(taskUrl)}
-                    locations={locations}
-                    users={allUsers}
-                    maintenanceGroups={maintenanceGroups}
-                    selectionMode={selectionMode}
-                    isSelected={selectedTasks.has(task.id)}
-                    onSelect={toggleTaskSelection}
-                    onMarkResolved={(id) => markResolvedMutation.mutate(id)}
-                  />
-                );
-              })}
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {sortedTasks.map(task => {
+                  const taskUrl = `/task/${task.id}`;
+                  return (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onClick={() => setLocation(taskUrl)}
+                      locations={locations}
+                      users={allUsers}
+                      maintenanceGroups={maintenanceGroups}
+                      selectionMode={selectionMode}
+                      isSelected={selectedTasks.has(task.id)}
+                      onSelect={toggleTaskSelection}
+                      onMarkResolved={(id) => markResolvedMutation.mutate(id)}
+                    />
+                  );
+                })}
+              </div>
             ) : (
-            <div className="space-y-2">
-              {sortedTasks.map(task => {
-                const filterParams = new URLSearchParams();
-                if (statusFilter !== "All") filterParams.set("status", statusFilter);
-                if (priorityFilter !== "All") filterParams.set("priority", priorityFilter);
-                if (locationCategoryFilter !== "All") filterParams.set("location", locationCategoryFilter);
-                if (userFilter !== "All") filterParams.set("user", userFilter);
-                if (groupFilter !== "All") filterParams.set("group", groupFilter);
-                const queryString = filterParams.toString();
-                const taskUrl = `/task/${task.id}${queryString ? `?${queryString}` : ""}`;
-                const location = locations.find(l => l.id === task.locationId);
-                const assignedUser = allUsers.find(u => u.id === task.assignedTo);
-                const priorityColors: Record<string, string> = {
-                  "Red Flag": "bg-red-100 text-red-800 border-red-300",
-                  "High": "bg-orange-100 text-orange-800 border-orange-300",
-                  "Normal": "bg-blue-100 text-blue-800 border-blue-300",
-                  "Low": "bg-green-100 text-green-800 border-green-300"
-                };
-                
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => selectionMode ? toggleTaskSelection(task.id) : setLocation(taskUrl)}
-                    className={cn(
-                      "flex items-center gap-4 p-3 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer",
-                      task.status === "Resolved" && "bg-green-50/50 border-green-200",
-                      selectedTasks.has(task.id) && "ring-2 ring-primary bg-primary/5"
-                    )}
-                  >
-                    {selectionMode && (
-                      <Checkbox
-                        checked={selectedTasks.has(task.id)}
-                        className="h-5 w-5 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={() => toggleTaskSelection(task.id)}
-                        data-testid={`checkbox-list-task-${task.id}`}
-                      />
-                    )}
-                    <div className={cn(
-                      "w-1 h-12 rounded-full shrink-0",
-                      task.status === "Resolved" ? "bg-green-500" :
-                      task.priority === "Red Flag" ? "bg-red-500" :
-                      task.priority === "High" ? "bg-orange-500" :
-                      task.priority === "Normal" ? "bg-blue-500" : "bg-green-500"
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium truncate">{task.title}</span>
-                        <Badge variant="outline" className={cn("text-xs shrink-0", priorityColors[task.priority])}>
-                          {task.priority}
-                        </Badge>
-                        {task.status === "Resolved" && (
-                          <Badge className="bg-green-100 text-green-800 border-green-300 text-xs shrink-0">
-                            Resolved
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {location?.name || "Unknown"}
-                        </span>
-                        {assignedUser && (
-                          <span className="truncate">→ {assignedUser.name}</span>
-                        )}
-                      </div>
-                    </div>
-                    {task.status !== "Resolved" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-green-600 hover:bg-green-50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markResolvedMutation.mutate(task.id);
-                        }}
-                        title="Mark as resolved"
-                        data-testid={`button-resolve-list-${task.id}`}
-                      >
-                        <CheckCircle2 className="h-5 w-5" />
-                      </Button>
-                    )}
-                    {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
-                      <div className="h-10 w-10 rounded overflow-hidden bg-muted shrink-0 border border-border">
-                        <img 
-                          src={`/api/tasks/${task.id}/thumbnail`} 
-                          alt="Task" 
-                          className="h-full w-full object-cover"
-                          loading="lazy"
+              <div className="space-y-2">
+                {sortedTasks.map(task => {
+                  const taskUrl = `/task/${task.id}`;
+                  const location = locations.find(l => l.id === task.locationId);
+                  const assignedUser = allUsers.find(u => u.id === task.assignedTo);
+                  const priorityColors: Record<string, string> = {
+                    "Red Flag": "bg-red-100 text-red-800 border-red-300",
+                    "High": "bg-orange-100 text-orange-800 border-orange-300",
+                    "Normal": "bg-blue-100 text-blue-800 border-blue-300",
+                    "Low": "bg-green-100 text-green-800 border-green-300"
+                  };
+
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={() => selectionMode ? toggleTaskSelection(task.id) : setLocation(taskUrl)}
+                      className={cn(
+                        "flex items-center gap-4 p-3 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer",
+                        task.status === "Resolved" && "bg-green-50/50 border-green-200",
+                        selectedTasks.has(task.id) && "ring-2 ring-primary bg-primary/5"
+                      )}
+                      data-testid={`row-smtr-task-${task.id}`}
+                    >
+                      {selectionMode && (
+                        <Checkbox
+                          checked={selectedTasks.has(task.id)}
+                          className="h-5 w-5 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => toggleTaskSelection(task.id)}
                         />
+                      )}
+                      <Badge className={cn("text-[10px] px-2 py-0.5 border shrink-0", priorityColors[task.priority] || "")}>
+                        {task.priority}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <span className="truncate">{location?.name || "Unknown"}</span>
+                          <span className="text-border">|</span>
+                          <Badge variant={task.status === "Resolved" ? "default" : "secondary"} className="text-[10px] h-4 px-1.5">
+                            {task.status}
+                          </Badge>
+                          {assignedUser && (
+                            <span className="truncate">→ {assignedUser.name}</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      {task.status !== "Resolved" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-green-600 hover:bg-green-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markResolvedMutation.mutate(task.id);
+                          }}
+                          title="Mark as resolved"
+                          data-testid={`button-smtr-resolve-${task.id}`}
+                        >
+                          <CheckCircle2 className="h-5 w-5" />
+                        </Button>
+                      )}
+                      {((task as any).hasImage || (task.imageUrl && task.imageUrl !== 'HAS_IMAGE')) && (
+                        <div className="h-10 w-10 rounded overflow-hidden bg-muted shrink-0 border border-border">
+                          <img
+                            src={`/api/tasks/${task.id}/thumbnail`}
+                            alt="Task"
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )
           ) : (
             <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
               <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                <Filter className="h-6 w-6 text-muted-foreground" />
+                <Wrench className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium text-foreground">No tasks found</h3>
-              <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or search query.</p>
-              <Button 
-                variant="link" 
-                className="mt-2 text-primary" 
-                onClick={() => {setSearchQuery(""); setStatusFilter("All"); setPriorityFilter("All"); setUserFilter("All"); setLocationCategoryFilter("All"); setLocationFilter("All"); setGroupFilter("All");}}
-              >
-                Clear all filters
-              </Button>
+              <h4 className="font-medium text-lg">No SMTR tasks found</h4>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {searchQuery || statusFilter !== "All" || priorityFilter !== "All"
+                  ? "Try adjusting your filters"
+                  : "No tasks are currently assigned to the SMTR team"}
+              </p>
             </div>
           )}
         </div>
       </div>
-
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setLocation("/create-task")}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center z-50 group"
-        data-testid="button-create-task-fab"
-        aria-label="Create New Task"
-      >
-        <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <Plus className="h-6 sm:h-7 w-6 sm:w-7 relative z-10" />
-      </button>
     </Layout>
   );
 }

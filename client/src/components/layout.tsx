@@ -10,7 +10,8 @@ import {
   X,
   UserCog,
   FileText,
-  ShoppingCart
+  ShoppingCart,
+  Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +39,7 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
     { href: "/tasks", label: "All Tasks", icon: ClipboardList },
     { href: "/shopping-list", label: "Achats", icon: ShoppingCart },
     { href: "/activity-log", label: "Activity Log", icon: FileText },
+    { href: "/smtr", label: "SMTR", icon: Wrench, hide: (authUser?.role || userRole) !== "Admin" },
     { href: "/admin", label: "Admin", icon: Settings, hide: userRole === "Basic Staff" || userRole === "Personnel" },
   ];
 
