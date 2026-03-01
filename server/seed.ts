@@ -127,6 +127,7 @@ async function seed() {
         { name: "Ménage", description: "Cleaning & Housekeeping", memberCount: 5 },
         { name: "Général", description: "General Maintenance", memberCount: 4 },
         { name: "Piscine", description: "Pool & Sauna Maintenance", memberCount: 2 },
+        { name: "SMTR team", description: "SMTR Maintenance Team", memberCount: 0 },
       ])
       .returning();
 
