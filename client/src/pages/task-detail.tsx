@@ -241,6 +241,14 @@ export default function TaskDetail() {
   });
 
   // Mutation to mark task as resolved
+  const getNextTaskAfterRemoval = () => {
+    if (sortedTasks.length <= 1) return null;
+    const idx = sortedTasks.findIndex(t => t.id === params?.id);
+    if (idx === -1) return null;
+    const nextIdx = idx < sortedTasks.length - 1 ? idx + 1 : idx - 1;
+    return sortedTasks[nextIdx];
+  };
+
   const markResolvedMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/tasks/${params?.id}`, {
@@ -251,13 +259,21 @@ export default function TaskDetail() {
       if (!response.ok) throw new Error("Failed to update task");
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: () => {
+      return { nextTask: getNextTaskAfterRemoval() };
+    },
+    onSuccess: (_data, _vars, context) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
         title: "Task Marked Resolved",
         description: "Task status has been updated to Resolved.",
       });
-      setTimeout(() => setLocation(`/${queryString}`), 1000);
+      const next = context?.nextTask;
+      if (next) {
+        setTimeout(() => setLocation(`/task/${next.id}${queryString}`), 600);
+      } else {
+        setTimeout(() => setLocation(`/${queryString}`), 600);
+      }
     },
     onError: () => {
       toast({
@@ -268,7 +284,6 @@ export default function TaskDetail() {
     },
   });
 
-  // Mutation to delete task (Admin only)
   const deleteTaskMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/tasks/${params?.id}`, {
@@ -277,13 +292,21 @@ export default function TaskDetail() {
       if (!response.ok) throw new Error("Failed to delete task");
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: () => {
+      return { nextTask: getNextTaskAfterRemoval() };
+    },
+    onSuccess: (_data, _vars, context) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
         title: "Task Deleted",
         description: "The task has been permanently deleted.",
       });
-      setLocation(`/${queryString}`);
+      const next = context?.nextTask;
+      if (next) {
+        setLocation(`/task/${next.id}${queryString}`);
+      } else {
+        setLocation(`/${queryString}`);
+      }
     },
     onError: () => {
       toast({
