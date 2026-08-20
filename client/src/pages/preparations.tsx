@@ -48,30 +48,6 @@ function BudgetTable({ lines }: { lines: BudgetLine[] }) {
   </table></div>;
 }
 
-function PortfolioTable({ rollups }: { rollups: any }) {
-  const sections = [
-    { label: "Project", lines: rollups.projects || [] },
-    { label: "Category", lines: rollups.categories || [] },
-    { label: "Trade", lines: rollups.trades || [] },
-  ];
-  return <div className="mt-4 overflow-x-auto rounded-lg border">
-    <table className="w-full min-w-[760px] text-sm">
-      <thead className="border-b bg-background text-left text-xs uppercase tracking-wider text-muted-foreground">
-        <tr><th className="px-4 py-3 font-medium">Level</th><th className="px-4 py-3 font-medium">Name</th><th className="px-4 py-3 text-right font-medium">Lines</th><th className="px-4 py-3 text-right font-medium">Planned</th><th className="px-4 py-3 text-right font-medium">Best quote</th><th className="px-4 py-3 text-right font-medium">Actual</th><th className="px-4 py-3 text-right font-medium">Variance</th></tr>
-      </thead>
-      <tbody>{sections.flatMap(section => section.lines.map((line: BudgetLine) => <tr key={`${section.label}-${line.name}`} className="border-b last:border-0">
-        <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.label}</td>
-        <td className="px-4 py-3 font-medium">{line.name}</td>
-        <td className="px-4 py-3 text-right text-muted-foreground">{line.taskCount}</td>
-        <td className="px-4 py-3 text-right">{money(line.estimated)}</td>
-        <td className="px-4 py-3 text-right">{money(line.quoted)}</td>
-        <td className="px-4 py-3 text-right">{money(line.actual)}</td>
-        <td className={`px-4 py-3 text-right font-medium ${line.variance < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(line.variance)}</td>
-      </tr>))}</tbody>
-    </table>
-  </div>;
-}
-
 export default function Preparations() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -237,7 +213,7 @@ export default function Preparations() {
       </Tabs>
     </div>}
 
-    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><PortfolioTable rollups={rollups.data} /></details></CardContent></Card>}
+    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.projects || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.categories || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.trades || []} /></CardContent></Card></div></details></CardContent></Card>}
   </div>
 
   <Dialog open={!!dialog && ["project", "trade", "task", "plan"].includes(dialog)} onOpenChange={open => !open && closeDialog()}><DialogContent><DialogHeader><DialogTitle>{dialog === "project" ? "New preparation project" : dialog === "trade" ? "Add trade" : dialog === "plan" ? "Attach executive plan" : editingTask ? "Edit procurement line" : "Add procurement line"}</DialogTitle></DialogHeader>
