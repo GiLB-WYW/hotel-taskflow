@@ -1,6 +1,7 @@
 import { type Server } from "node:http";
 
 import express, { type Express, type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 
 export function log(message: string, source = "express") {
@@ -15,12 +16,24 @@ export function log(message: string, source = "express") {
 }
 
 export const app = express();
+const sessionSecret = process.env.SESSION_SECRET;
+
+if (process.env.NODE_ENV === "production" && !sessionSecret) {
+  throw new Error("SESSION_SECRET must be configured in production");
+}
 
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
   }
 }
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
+
 app.use(express.json({
   limit: '50mb',
   verify: (req, _res, buf) => {
@@ -28,6 +41,18 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ limit: '50mb', extended: false }));
+app.set("trust proxy", 1);
+app.use(session({
+  secret: sessionSecret || "development-session-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 12,
+  },
+}));
 
 // Prevent caching of API responses - critical for production data freshness
 app.use('/api', (req, res, next) => {

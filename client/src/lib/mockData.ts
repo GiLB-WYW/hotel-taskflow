@@ -21,6 +21,7 @@ export interface Task {
   status: Status;
   assignedTo?: string;
   assignedGroup?: string;
+  assignedGroups?: string[];
   createdBy: string;
   createdAt: string;
   updatedAt?: string;

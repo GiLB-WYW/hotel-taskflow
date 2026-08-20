@@ -112,9 +112,11 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    setDialogProvider("google");
-    setDialogEmail("");
-    setEmailDialogOpen(true);
+    toast({
+      title: "Password sign-in required",
+      description: "Use your account password or complete the invitation sent by your administrator.",
+      variant: "destructive",
+    });
   };
 
   const handleEmailDialogSubmit = async () => {

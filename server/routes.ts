@@ -1,11 +1,24 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertTaskSchema, insertLocationSchema, insertMaintenanceGroupSchema, insertCategorySchema, insertActivityLogSchema } from "@shared/schema";
+import {
+  insertUserSchema,
+  insertTaskSchema,
+  insertLocationSchema,
+  insertMaintenanceGroupSchema,
+  insertCategorySchema,
+  insertActivityLogSchema,
+  insertProjectSchema,
+  insertProjectPlanSchema,
+  insertTradeSchema,
+  insertProjectTaskSchema,
+  insertQuoteSchema,
+} from "@shared/schema";
 import { z } from "zod";
 import { sendInvitationEmail } from "./email";
 import crypto from "crypto";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 
 async function ensureSmtrGroup() {
   try {
@@ -20,12 +33,108 @@ async function ensureSmtrGroup() {
   }
 }
 
+async function ensureDefaultTrades() {
+  try {
+    const existing = await storage.listTrades();
+    const names = ["Plumber", "Electrician", "Pool", "HVAC", "Painting", "General"];
+    const existingNames = new Set(existing.map(trade => trade.name.trim().toLowerCase()));
+
+    for (const name of names) {
+      if (!existingNames.has(name.toLowerCase())) {
+        await storage.createTrade({ name });
+      }
+    }
+  } catch (error) {
+    console.error("Failed to ensure default preparation trades:", error);
+  }
+}
+
+async function ensureInitialAdmin() {
+  const users = await storage.listUsers();
+  if (users.length > 0) {
+    return;
+  }
+
+  const email = process.env.INITIAL_ADMIN_EMAIL;
+  const password = process.env.INITIAL_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.warn("No users exist. Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD as deployment secrets to provision the first administrator.");
+    return;
+  }
+
+  await storage.createUser({
+    name: process.env.INITIAL_ADMIN_NAME || "Administrator",
+    email,
+    password,
+    role: "Admin",
+  });
+  console.log("Initial administrator provisioned from deployment secrets.");
+}
+
+function hasPreparationAccess(role: string | null | undefined) {
+  return role === "Admin" || role === "Coordinator";
+}
+
+async function getSessionUser(req: Request) {
+  if (!req.session.userId) {
+    return null;
+  }
+  return storage.getUser(req.session.userId);
+}
+
+async function requirePreparationAccess(req: Request, res: Response) {
+  const user = await getSessionUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Please sign in to access project preparations." });
+    return null;
+  }
+
+  if (!hasPreparationAccess(user.role)) {
+    res.status(403).json({ error: "Project preparations are restricted to Admins and Coordinators." });
+    return null;
+  }
+
+  return user;
+}
+
+async function requireAdminAccess(req: Request, res: Response) {
+  const user = await getSessionUser(req);
+  if (!user || user.role !== "Admin") {
+    res.status(403).json({ error: "Administrator access is required." });
+    return null;
+  }
+  return user;
+}
+
+function normalizeCurrencyFields<T extends Record<string, unknown>>(data: T, fields: string[]): T {
+  const normalized: Record<string, unknown> = { ...data };
+  for (const field of fields) {
+    if (normalized[field] !== undefined && normalized[field] !== null && normalized[field] !== "") {
+      normalized[field] = String(normalized[field]);
+    }
+  }
+  return normalized as T;
+}
+
+function hasValidNonNegativeCurrency(data: Record<string, unknown>, fields: string[]) {
+  return fields.every(field => {
+    const value = data[field];
+    return value === undefined || value === null || value === "" ||
+      (Number.isFinite(Number(value)) && Number(value) >= 0);
+  });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register object storage routes for file uploads
-  registerObjectStorageRoutes(app);
+  registerObjectStorageRoutes(app, async (req) => {
+    const user = await getSessionUser(req);
+    return hasPreparationAccess(user?.role);
+  });
 
   // Ensure SMTR team group exists in the database
   await ensureSmtrGroup();
+  await ensureInitialAdmin();
+  await ensureDefaultTrades();
   
   // Debug endpoint to test task serialization
   app.get("/api/debug/tasks-sample", async (req, res) => {
@@ -78,6 +187,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/register", async (req, res) => {
     try {
+      const actor = await getSessionUser(req);
+      if (actor?.role !== "Admin") {
+        return res.status(403).json({ error: "Administrator access is required to create users." });
+      }
       const data = insertUserSchema.parse(req.body);
       const existingUser = await storage.getUserByEmail(data.email);
       
@@ -131,12 +244,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Don't send password hash to client
       const { password: _, ...userWithoutPassword } = user;
+      req.session.userId = user.id;
       console.log("Login successful for:", email);
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
   });
 
   // Session validation endpoint - verifies if stored session corresponds to real user
@@ -169,67 +290,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email-only login for users without passwords (Google/Microsoft button)
+  // Do not treat an arbitrary email address as an authenticated identity.
   app.post("/api/auth/email-login", async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ error: "Email required" });
-      }
-
-      const user = await storage.getUserByEmail(email.trim().toLowerCase());
-      
-      if (!user) {
-        return res.status(401).json({ error: "No account found with this email. Please contact your administrator." });
-      }
-
-      // Don't send password hash to client
-      const { password: _, ...userWithoutPassword } = user;
-      console.log("Email login successful for:", email);
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Email login error:", error);
-      res.status(500).json({ error: "Login failed" });
-    }
+    res.status(410).json({ error: "Password sign-in is required. Complete an invitation or use your account password." });
   });
 
   app.post("/api/auth/oauth", async (req, res) => {
-    try {
-      const { authProvider, authId, name, email } = req.body;
-      
-      if (!authProvider || !authId || !email) {
-        return res.status(400).json({ error: "Missing required OAuth fields" });
-      }
-
-      // Try to find existing user by OAuth ID
-      let user = await storage.getUserByAuthId(authProvider, authId);
-      
-      if (!user) {
-        // Try to find by email
-        user = await storage.getUserByEmail(email);
-        
-        if (user) {
-          // Link OAuth to existing account
-          user = await storage.updateUser(user.id, {
-            authProvider,
-            authId,
-          });
-        } else {
-          // Create new user
-          user = await storage.createUser({
-            name: name || email,
-            email,
-            authProvider,
-            authId,
-          });
-        }
-      }
-
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ error: "OAuth login failed" });
-    }
+    res.status(410).json({ error: "OAuth sign-in is unavailable until identity-token verification is configured." });
   });
 
   // User routes
@@ -262,6 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/users/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const { name, email, role, password, groups, group } = req.body;
       const updates: any = {};
       
@@ -287,6 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/users/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       await storage.deleteUser(req.params.id);
       res.json({ message: "User deleted successfully" });
     } catch (error) {
@@ -298,9 +367,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/change-password", async (req, res) => {
     try {
       const { userId, currentPassword, newPassword } = req.body;
+      const actor = await getSessionUser(req);
       
       if (!userId || !newPassword) {
         return res.status(400).json({ error: "User ID and new password required" });
+      }
+      if (!actor || actor.id !== userId) {
+        return res.status(403).json({ error: "You may only change your own password from an authenticated session." });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ error: "Current password is required" });
       }
 
       const user = await storage.getUser(userId);
@@ -308,12 +384,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // If user has a password, verify the current one
-      if (user.password && currentPassword) {
-        const isValid = await storage.verifyPassword(userId, currentPassword);
-        if (!isValid) {
-          return res.status(401).json({ error: "Current password is incorrect" });
-        }
+      const isValid = await storage.verifyPassword(userId, currentPassword);
+      if (!isValid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
       }
 
       await storage.updatePassword(userId, newPassword);
@@ -354,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user = await storage.createUser({
             name: name?.trim() || "User",
             email: email?.trim() || `${userId}@oauth.local`,
-            role: "Admin",
+            role: "Basic Staff",
             authProvider: provider || "google",
             authId: userId,
           });
@@ -380,9 +453,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invitation routes
   app.post("/api/invitations", async (req, res) => {
     try {
-      const { email, name, role, invitedBy } = req.body;
+      const actor = await requireAdminAccess(req, res);
+      if (!actor) return;
+      const { email, name, role } = req.body;
 
-      if (!email || !name || !role || !invitedBy) {
+      if (!email || !name || !role) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
@@ -411,12 +486,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         role,
         token,
-        invitedBy,
+        invitedBy: actor.id,
         expiresAt,
       });
 
       // Get inviter info for email
-      const inviter = await storage.getUser(invitedBy);
+      const inviter = await storage.getUser(actor.id);
       const inviterName = inviter?.name || 'An administrator';
 
       // Send invitation email
@@ -507,6 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
+      req.session.userId = user.id;
       res.status(201).json(userWithoutPassword);
     } catch (error) {
       console.error('Failed to accept invitation:', error);
@@ -1079,6 +1155,326 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Maintenance group deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete maintenance group" });
+    }
+  });
+
+  // Project Preparation — each endpoint verifies a real Admin or Coordinator.
+  app.get("/api/preparations/buildings", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      res.json(await storage.listLocations());
+    } catch (error) {
+      console.error("Failed to fetch preparation buildings:", error);
+      res.status(500).json({ error: "Failed to fetch buildings." });
+    }
+  });
+
+  app.get("/api/preparations/projects", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const buildingId = typeof req.query.buildingId === "string" ? req.query.buildingId : undefined;
+      res.json(await storage.listProjects(buildingId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch projects." });
+    }
+  });
+
+  app.post("/api/preparations/projects", async (req, res) => {
+    try {
+      const actor = await requirePreparationAccess(req, res);
+      if (!actor) return;
+      const building = await storage.getLocation(req.body.buildingId);
+      if (!building) return res.status(404).json({ error: "Building not found." });
+      const project = await storage.createProject(insertProjectSchema.parse({
+        ...req.body,
+        createdBy: actor.id,
+      }));
+      res.status(201).json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create project." });
+    }
+  });
+
+  app.patch("/api/preparations/projects/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProject(req.params.id)) return res.status(404).json({ error: "Project not found." });
+      if (req.body.buildingId && !await storage.getLocation(req.body.buildingId)) {
+        return res.status(404).json({ error: "Building not found." });
+      }
+      const project = await storage.updateProject(req.params.id, insertProjectSchema.partial().parse(req.body));
+      res.json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update project." });
+    }
+  });
+
+  app.delete("/api/preparations/projects/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      await storage.deleteProject(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete project." });
+    }
+  });
+
+  app.get("/api/preparations/projects/:projectId/plans", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      res.json(await storage.listProjectPlans(req.params.projectId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch executive plans." });
+    }
+  });
+
+  app.post("/api/preparations/projects/:projectId/plans", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProject(req.params.projectId)) return res.status(404).json({ error: "Project not found." });
+      const plan = await storage.createProjectPlan(insertProjectPlanSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+      }));
+      res.status(201).json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to save executive plan." });
+    }
+  });
+
+  app.delete("/api/preparations/plans/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      await storage.deleteProjectPlan(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete executive plan." });
+    }
+  });
+
+  app.get("/api/preparations/trades", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      res.json(await storage.listTrades());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch trades." });
+    }
+  });
+
+  app.post("/api/preparations/trades", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const trade = await storage.createTrade(insertTradeSchema.parse(req.body));
+      res.status(201).json(trade);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create trade." });
+    }
+  });
+
+  app.patch("/api/preparations/trades/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      res.json(await storage.updateTrade(req.params.id, insertTradeSchema.partial().parse(req.body)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update trade." });
+    }
+  });
+
+  app.delete("/api/preparations/trades/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      await storage.deleteTrade(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete trade." });
+    }
+  });
+
+  app.get("/api/preparations/project-tasks", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
+      res.json(await storage.listProjectTasks(projectId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch project tasks." });
+    }
+  });
+
+  app.post("/api/preparations/project-tasks", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProject(req.body.projectId)) return res.status(404).json({ error: "Project not found." });
+      if (req.body.tradeId && !(await storage.listTrades()).some(trade => trade.id === req.body.tradeId)) {
+        return res.status(404).json({ error: "Trade not found." });
+      }
+      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
+        return res.status(400).json({ error: "Costs must be non-negative numbers." });
+      }
+      const data = normalizeCurrencyFields(req.body, ["estimatedCost", "actualCost"]);
+      const task = await storage.createProjectTask(insertProjectTaskSchema.parse(data));
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create project task." });
+    }
+  });
+
+  app.patch("/api/preparations/project-tasks/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProjectTask(req.params.id)) return res.status(404).json({ error: "Project task not found." });
+      if (req.body.projectId && !await storage.getProject(req.body.projectId)) {
+        return res.status(404).json({ error: "Project not found." });
+      }
+      if (req.body.tradeId && !(await storage.listTrades()).some(trade => trade.id === req.body.tradeId)) {
+        return res.status(404).json({ error: "Trade not found." });
+      }
+      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
+        return res.status(400).json({ error: "Costs must be non-negative numbers." });
+      }
+      const data = normalizeCurrencyFields(req.body, ["estimatedCost", "actualCost"]);
+      res.json(await storage.updateProjectTask(req.params.id, insertProjectTaskSchema.partial().parse(data)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update project task." });
+    }
+  });
+
+  app.delete("/api/preparations/project-tasks/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      await storage.deleteProjectTask(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete project task." });
+    }
+  });
+
+  app.get("/api/preparations/project-tasks/:taskId/quotes", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      res.json(await storage.listQuotes(req.params.taskId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quotes." });
+    }
+  });
+
+  app.post("/api/preparations/project-tasks/:taskId/quotes", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProjectTask(req.params.taskId)) return res.status(404).json({ error: "Project task not found." });
+      if (!hasValidNonNegativeCurrency(req.body, ["amount"])) {
+        return res.status(400).json({ error: "Quote amount must be a non-negative number." });
+      }
+      const data = normalizeCurrencyFields({ ...req.body, projectTaskId: req.params.taskId }, ["amount"]);
+      const quote = await storage.createQuote(insertQuoteSchema.parse(data));
+      res.status(201).json(quote);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create quote." });
+    }
+  });
+
+  app.patch("/api/preparations/quotes/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getQuote(req.params.id)) return res.status(404).json({ error: "Quote not found." });
+      if (!hasValidNonNegativeCurrency(req.body, ["amount"])) {
+        return res.status(400).json({ error: "Quote amount must be a non-negative number." });
+      }
+      const { projectTaskId: _projectTaskId, ...quoteUpdates } = req.body;
+      const data = normalizeCurrencyFields(quoteUpdates, ["amount"]);
+      res.json(await storage.updateQuote(req.params.id, insertQuoteSchema.partial().parse(data)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update quote." });
+    }
+  });
+
+  app.delete("/api/preparations/quotes/:id", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      await storage.deleteQuote(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete quote." });
+    }
+  });
+
+  app.post("/api/preparations/upload-url", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const { name, size, contentType } = req.body;
+      if (!name || typeof name !== "string") return res.status(400).json({ error: "A file name is required." });
+      if (!name.toLowerCase().endsWith(".pdf") || contentType !== "application/pdf") {
+        return res.status(400).json({ error: "Executive plans and quotes must be PDF files." });
+      }
+      if (!Number.isInteger(size) || size <= 0 || size > 25 * 1024 * 1024) {
+        return res.status(400).json({ error: "PDF files must be between 1 byte and 25 MB." });
+      }
+      const objectStorage = new ObjectStorageService();
+      const uploadURL = await objectStorage.getObjectEntityUploadURL("preparations");
+      res.json({
+        uploadURL,
+        objectPath: objectStorage.normalizeObjectEntityPath(uploadURL),
+        metadata: { name, size, contentType: contentType || "application/pdf" },
+      });
+    } catch (error) {
+      console.error("Failed to create preparation upload URL:", error);
+      res.status(500).json({ error: "Failed to prepare file upload." });
+    }
+  });
+
+  app.get("/api/preparations/rollups", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const [projects, projectTasks, trades] = await Promise.all([
+        storage.listProjects(),
+        storage.listProjectTasks(),
+        storage.listTrades(),
+      ]);
+      const projectBuilding = new Map(projects.map(project => [project.id, project.buildingId]));
+      const buildingTotals = new Map<string, { estimated: number; actual: number }>();
+      const tradeTotals = new Map<string, { estimated: number; actual: number }>();
+      let estimated = 0;
+      let actual = 0;
+
+      for (const task of projectTasks) {
+        const estimatedCost = Number(task.estimatedCost) || 0;
+        const actualCost = Number(task.actualCost) || 0;
+        estimated += estimatedCost;
+        actual += actualCost;
+        const buildingId = projectBuilding.get(task.projectId);
+        if (buildingId) {
+          const total = buildingTotals.get(buildingId) || { estimated: 0, actual: 0 };
+          total.estimated += estimatedCost;
+          total.actual += actualCost;
+          buildingTotals.set(buildingId, total);
+        }
+        if (task.tradeId) {
+          const total = tradeTotals.get(task.tradeId) || { estimated: 0, actual: 0 };
+          total.estimated += estimatedCost;
+          total.actual += actualCost;
+          tradeTotals.set(task.tradeId, total);
+        }
+      }
+
+      res.json({
+        grandTotal: { estimated, actual },
+        buildings: Array.from(buildingTotals, ([buildingId, total]) => ({ buildingId, ...total })),
+        trades: trades.map(trade => ({
+          tradeId: trade.id,
+          tradeName: trade.name,
+          ...(tradeTotals.get(trade.id) || { estimated: 0, actual: 0 }),
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to calculate cost rollups." });
     }
   });
 

@@ -20,6 +20,16 @@ import {
   type InsertActivityLog,
   type ShoppingItem,
   type InsertShoppingItem,
+  type Project,
+  type InsertProject,
+  type ProjectPlan,
+  type InsertProjectPlan,
+  type Trade,
+  type InsertTrade,
+  type ProjectTask,
+  type InsertProjectTask,
+  type Quote,
+  type InsertQuote,
   usersTable,
   categoriesTable,
   locationsTable,
@@ -30,6 +40,11 @@ import {
   notificationsTable,
   activityLogTable,
   shoppingItemsTable,
+  projectsTable,
+  projectPlansTable,
+  tradesTable,
+  projectTasksTable,
+  quotesTable,
   insertUserSchema,
   insertCategorySchema,
   insertLocationSchema,
@@ -40,8 +55,13 @@ import {
   insertNotificationSchema,
   insertActivityLogSchema,
   insertShoppingItemSchema,
+  insertProjectSchema,
+  insertProjectPlanSchema,
+  insertTradeSchema,
+  insertProjectTaskSchema,
+  insertQuoteSchema,
 } from "@shared/schema";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, inArray } from "drizzle-orm";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 
@@ -133,6 +153,30 @@ export interface IStorage {
   createShoppingItem(item: InsertShoppingItem): Promise<ShoppingItem>;
   deleteShoppingItem(id: string): Promise<void>;
   listShoppingItems(): Promise<ShoppingItem[]>;
+
+  // Project preparation
+  getProject(id: string): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: string, updates: Partial<InsertProject>): Promise<Project>;
+  deleteProject(id: string): Promise<void>;
+  listProjects(buildingId?: string): Promise<Project[]>;
+  listProjectPlans(projectId: string): Promise<ProjectPlan[]>;
+  createProjectPlan(plan: InsertProjectPlan): Promise<ProjectPlan>;
+  deleteProjectPlan(id: string): Promise<void>;
+  listTrades(): Promise<Trade[]>;
+  createTrade(trade: InsertTrade): Promise<Trade>;
+  updateTrade(id: string, updates: Partial<InsertTrade>): Promise<Trade>;
+  deleteTrade(id: string): Promise<void>;
+  getProjectTask(id: string): Promise<ProjectTask | undefined>;
+  listProjectTasks(projectId?: string): Promise<ProjectTask[]>;
+  createProjectTask(task: InsertProjectTask): Promise<ProjectTask>;
+  updateProjectTask(id: string, updates: Partial<InsertProjectTask>): Promise<ProjectTask>;
+  deleteProjectTask(id: string): Promise<void>;
+  listQuotes(projectTaskId: string): Promise<Quote[]>;
+  getQuote(id: string): Promise<Quote | undefined>;
+  createQuote(quote: InsertQuote): Promise<Quote>;
+  updateQuote(id: string, updates: Partial<InsertQuote>): Promise<Quote>;
+  deleteQuote(id: string): Promise<void>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -551,6 +595,145 @@ export class PostgresStorage implements IStorage {
 
   async listShoppingItems(): Promise<ShoppingItem[]> {
     return await db.select().from(shoppingItemsTable).orderBy(desc(shoppingItemsTable.createdAt));
+  }
+
+  // Project preparation
+  async getProject(id: string): Promise<Project | undefined> {
+    const project = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    return project[0];
+  }
+
+  async createProject(data: InsertProject): Promise<Project> {
+    const validated = insertProjectSchema.parse(data);
+    const project = await db.insert(projectsTable).values(validated).returning();
+    return project[0];
+  }
+
+  async updateProject(id: string, updates: Partial<InsertProject>): Promise<Project> {
+    const validated = insertProjectSchema.partial().parse(updates);
+    const project = await db.update(projectsTable)
+      .set({ ...validated, updatedAt: new Date() })
+      .where(eq(projectsTable.id, id))
+      .returning();
+    return project[0];
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    const tasks = await this.listProjectTasks(id);
+    if (tasks.length > 0) {
+      await db.delete(quotesTable).where(inArray(quotesTable.projectTaskId, tasks.map(task => task.id)));
+    }
+    await db.delete(projectTasksTable).where(eq(projectTasksTable.projectId, id));
+    await db.delete(projectPlansTable).where(eq(projectPlansTable.projectId, id));
+    await db.delete(projectsTable).where(eq(projectsTable.id, id));
+  }
+
+  async listProjects(buildingId?: string): Promise<Project[]> {
+    const query = db.select().from(projectsTable);
+    if (buildingId) {
+      return await query.where(eq(projectsTable.buildingId, buildingId)).orderBy(desc(projectsTable.createdAt));
+    }
+    return await query.orderBy(desc(projectsTable.createdAt));
+  }
+
+  async listProjectPlans(projectId: string): Promise<ProjectPlan[]> {
+    return await db.select().from(projectPlansTable)
+      .where(eq(projectPlansTable.projectId, projectId))
+      .orderBy(desc(projectPlansTable.createdAt));
+  }
+
+  async createProjectPlan(data: InsertProjectPlan): Promise<ProjectPlan> {
+    const validated = insertProjectPlanSchema.parse(data);
+    const plan = await db.insert(projectPlansTable).values(validated).returning();
+    return plan[0];
+  }
+
+  async deleteProjectPlan(id: string): Promise<void> {
+    await db.delete(projectPlansTable).where(eq(projectPlansTable.id, id));
+  }
+
+  async listTrades(): Promise<Trade[]> {
+    return await db.select().from(tradesTable).orderBy(tradesTable.name);
+  }
+
+  async createTrade(data: InsertTrade): Promise<Trade> {
+    const validated = insertTradeSchema.parse(data);
+    const trade = await db.insert(tradesTable).values(validated).returning();
+    return trade[0];
+  }
+
+  async updateTrade(id: string, updates: Partial<InsertTrade>): Promise<Trade> {
+    const validated = insertTradeSchema.partial().parse(updates);
+    const trade = await db.update(tradesTable).set(validated).where(eq(tradesTable.id, id)).returning();
+    return trade[0];
+  }
+
+  async deleteTrade(id: string): Promise<void> {
+    await db.update(projectTasksTable).set({ tradeId: null }).where(eq(projectTasksTable.tradeId, id));
+    await db.delete(tradesTable).where(eq(tradesTable.id, id));
+  }
+
+  async getProjectTask(id: string): Promise<ProjectTask | undefined> {
+    const task = await db.select().from(projectTasksTable).where(eq(projectTasksTable.id, id));
+    return task[0];
+  }
+
+  async listProjectTasks(projectId?: string): Promise<ProjectTask[]> {
+    const query = db.select().from(projectTasksTable);
+    if (projectId) {
+      return await query.where(eq(projectTasksTable.projectId, projectId)).orderBy(desc(projectTasksTable.createdAt));
+    }
+    return await query.orderBy(desc(projectTasksTable.createdAt));
+  }
+
+  async createProjectTask(data: InsertProjectTask): Promise<ProjectTask> {
+    const validated = insertProjectTaskSchema.parse(data);
+    const task = await db.insert(projectTasksTable).values(validated).returning();
+    return task[0];
+  }
+
+  async updateProjectTask(id: string, updates: Partial<InsertProjectTask>): Promise<ProjectTask> {
+    const validated = insertProjectTaskSchema.partial().parse(updates);
+    const task = await db.update(projectTasksTable)
+      .set({ ...validated, updatedAt: new Date() })
+      .where(eq(projectTasksTable.id, id))
+      .returning();
+    return task[0];
+  }
+
+  async deleteProjectTask(id: string): Promise<void> {
+    await db.delete(quotesTable).where(eq(quotesTable.projectTaskId, id));
+    await db.delete(projectTasksTable).where(eq(projectTasksTable.id, id));
+  }
+
+  async listQuotes(projectTaskId: string): Promise<Quote[]> {
+    return await db.select().from(quotesTable)
+      .where(eq(quotesTable.projectTaskId, projectTaskId))
+      .orderBy(quotesTable.amount);
+  }
+
+  async getQuote(id: string): Promise<Quote | undefined> {
+    const quote = await db.select().from(quotesTable).where(eq(quotesTable.id, id));
+    return quote[0];
+  }
+
+  async createQuote(data: InsertQuote): Promise<Quote> {
+    const validated = insertQuoteSchema.parse(data);
+    const quote = await db.insert(quotesTable).values(validated).returning();
+    return quote[0];
+  }
+
+  async updateQuote(id: string, updates: Partial<InsertQuote>): Promise<Quote> {
+    const validated = insertQuoteSchema.partial().parse(updates);
+    const quote = await db.update(quotesTable)
+      .set({ ...validated, updatedAt: new Date() })
+      .where(eq(quotesTable.id, id))
+      .returning();
+    return quote[0];
+  }
+
+  async deleteQuote(id: string): Promise<void> {
+    await db.delete(quotesTable).where(eq(quotesTable.id, id));
   }
 }
 

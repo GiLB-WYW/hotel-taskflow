@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 /**
@@ -13,7 +13,10 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
  * - Add file metadata storage (save to database after upload)
  * - Add ACL policies for access control
  */
-export function registerObjectStorageRoutes(app: Express): void {
+export function registerObjectStorageRoutes(
+  app: Express,
+  canReadObject?: (req: Request, objectPath: string) => Promise<boolean>,
+): void {
   const objectStorageService = new ObjectStorageService();
 
   /**
@@ -72,6 +75,12 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
+      if (req.path.startsWith("/objects/preparations/") && canReadObject) {
+        const allowed = await canReadObject(req, req.path);
+        if (!allowed) {
+          return res.status(403).json({ error: "You do not have access to this file." });
+        }
+      }
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error) {

@@ -372,7 +372,7 @@ export default function TaskDetail() {
 
   const handleChangeGroups = async () => {
     try {
-      await updateTaskMutation.mutateAsync({ assignedGroups: selectedGroups, assignedGroup: selectedGroups[0] || null });
+      await updateTaskMutation.mutateAsync({ assignedGroups: selectedGroups, assignedGroup: selectedGroups[0] || undefined });
       setIsChangeGroupDialogOpen(false);
       toast({ title: "Success", description: "Assigned groups updated." });
     } catch (error) {

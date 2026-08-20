@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -120,6 +120,58 @@ export const activityLogTable = pgTable("activity_log", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+// Project preparation records. Buildings reuse existing locations so preparation
+// planning remains connected to the hotel's location data.
+export const projectsTable = pgTable("projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  buildingId: varchar("building_id").notNull().references(() => locationsTable.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: varchar("status").notNull().default("Planning"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const projectPlansTable = pgTable("project_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const tradesTable = pgTable("trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const projectTasksTable = pgTable("project_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  tradeId: varchar("trade_id").references(() => tradesTable.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: varchar("status").notNull().default("Planned"),
+  estimatedCost: numeric("estimated_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+  actualCost: numeric("actual_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const quotesTable = pgTable("quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectTaskId: varchar("project_task_id").notNull().references(() => projectTasksTable.id, { onDelete: "cascade" }),
+  supplierName: text("supplier_name").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  fileName: text("file_name"),
+  fileUrl: text("file_url"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
@@ -175,6 +227,34 @@ export const insertShoppingItemSchema = createInsertSchema(shoppingItemsTable).o
   createdAt: true,
 });
 
+export const insertProjectSchema = createInsertSchema(projectsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectPlanSchema = createInsertSchema(projectPlansTable).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTradeSchema = createInsertSchema(tradesTable).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProjectTaskSchema = createInsertSchema(projectTasksTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuoteSchema = createInsertSchema(quotesTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Select types
 export type User = typeof usersTable.$inferSelect;
 export type Category = typeof categoriesTable.$inferSelect;
@@ -186,6 +266,11 @@ export type Invitation = typeof invitationsTable.$inferSelect;
 export type Notification = typeof notificationsTable.$inferSelect;
 export type ActivityLog = typeof activityLogTable.$inferSelect;
 export type ShoppingItem = typeof shoppingItemsTable.$inferSelect;
+export type Project = typeof projectsTable.$inferSelect;
+export type ProjectPlan = typeof projectPlansTable.$inferSelect;
+export type Trade = typeof tradesTable.$inferSelect;
+export type ProjectTask = typeof projectTasksTable.$inferSelect;
+export type Quote = typeof quotesTable.$inferSelect;
 
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -198,3 +283,8 @@ export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type InsertShoppingItem = z.infer<typeof insertShoppingItemSchema>;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type InsertProjectPlan = z.infer<typeof insertProjectPlanSchema>;
+export type InsertTrade = z.infer<typeof insertTradeSchema>;
+export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;

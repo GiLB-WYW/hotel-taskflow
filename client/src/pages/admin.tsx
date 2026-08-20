@@ -915,6 +915,7 @@ export default function Admin() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Coordinator">Coordinator</SelectItem>
                               <SelectItem value="Manager">Manager</SelectItem>
                               <SelectItem value="Personnel">Personnel</SelectItem>
                               <SelectItem value="Basic Staff">Basic Staff</SelectItem>
@@ -992,6 +993,7 @@ export default function Admin() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Coordinator">Coordinator</SelectItem>
                               <SelectItem value="Manager">Manager</SelectItem>
                               <SelectItem value="Personnel">Personnel</SelectItem>
                               <SelectItem value="Basic Staff">Basic Staff</SelectItem>
@@ -1273,6 +1275,7 @@ export default function Admin() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Coordinator">Coordinator</SelectItem>
                     <SelectItem value="Manager">Manager</SelectItem>
                     <SelectItem value="Personnel">Personnel</SelectItem>
                     <SelectItem value="Basic Staff">Basic Staff</SelectItem>

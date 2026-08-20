@@ -20,6 +20,7 @@ import Settings from "@/pages/settings";
 import ActivityLog from "@/pages/activity-log";
 import ShoppingList from "@/pages/shopping-list";
 import SmtrPage from "@/pages/smtr";
+import Preparations from "@/pages/preparations";
 
 function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
@@ -47,6 +48,7 @@ function Router({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Route path="/activity-log" component={ActivityLog} />
       <Route path="/shopping-list" component={ShoppingList} />
       <Route path="/smtr" component={SmtrPage} />
+      <Route path="/preparations" component={Preparations} />
       <Route component={NotFound} />
     </Switch>
   );
