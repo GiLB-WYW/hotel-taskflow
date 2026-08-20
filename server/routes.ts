@@ -1903,7 +1903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, size, contentType } = req.body;
       if (!name || typeof name !== "string") return res.status(400).json({ error: "A file name is required." });
       if (!name.toLowerCase().endsWith(".pdf") || contentType !== "application/pdf") {
-        return res.status(400).json({ error: "Executive plans and quotes must be PDF files." });
+        return res.status(400).json({ error: "Preparation documents, including invoices, must be PDF files." });
       }
       if (!Number.isInteger(size) || size <= 0 || size > 25 * 1024 * 1024) {
         return res.status(400).json({ error: "PDF files must be between 1 byte and 25 MB." });
