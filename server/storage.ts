@@ -169,6 +169,7 @@ export interface IStorage {
   updateTrade(id: string, updates: Partial<InsertTrade>): Promise<Trade>;
   deleteTrade(id: string): Promise<void>;
   getProjectTask(id: string): Promise<ProjectTask | undefined>;
+  getProjectTaskBySourceTaskId(sourceTaskId: string): Promise<ProjectTask | undefined>;
   listProjectTasks(projectId?: string): Promise<ProjectTask[]>;
   createProjectTask(task: InsertProjectTask): Promise<ProjectTask>;
   updateProjectTask(id: string, updates: Partial<InsertProjectTask>): Promise<ProjectTask>;
@@ -703,6 +704,11 @@ export class PostgresStorage implements IStorage {
 
   async getProjectTask(id: string): Promise<ProjectTask | undefined> {
     const task = await db.select().from(projectTasksTable).where(eq(projectTasksTable.id, id));
+    return task[0];
+  }
+
+  async getProjectTaskBySourceTaskId(sourceTaskId: string): Promise<ProjectTask | undefined> {
+    const task = await db.select().from(projectTasksTable).where(eq(projectTasksTable.sourceTaskId, sourceTaskId));
     return task[0];
   }
 

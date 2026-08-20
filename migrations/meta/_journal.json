@@ -8,6 +8,13 @@
       "when": 1787040000000,
       "tag": "0000_project_preparations",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787310000000,
+      "tag": "0001_preparation_work_register",
+      "breakpoints": true
     }
   ]
 }

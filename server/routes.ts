@@ -37,7 +37,7 @@ async function ensureSmtrGroup() {
 async function ensureDefaultTrades() {
   try {
     const existing = await storage.listTrades();
-    const names = ["Plumber", "Electrician", "Pool", "HVAC", "Painting", "General"];
+    const names = ["Electrical", "Plumbing", "Climate Control", "General Works", "Landscaping", "Kitchen Equipment", "Pool", "Painting"];
     const existingNames = new Set(existing.map(trade => trade.name.trim().toLowerCase()));
 
     for (const name of names) {
@@ -172,6 +172,32 @@ function hasValidNonNegativeCurrency(data: Record<string, unknown>, fields: stri
     return value === undefined || value === null || value === "" ||
       (Number.isFinite(Number(value)) && Number(value) >= 0);
   });
+}
+
+function classifyMaintenanceTask(groupName?: string | null, title?: string | null) {
+  const value = `${groupName || ""} ${title || ""}`.toLowerCase();
+  if (/(electric|électric|luminaire|lumière|borne|éclairage|radiateur)/.test(value)) {
+    return { category: "Electrical", tradeName: "Electrical" };
+  }
+  if (/(plomb|eau|évacuation|adoucisseur|toilette|chaudière)/.test(value)) {
+    return { category: "Plumbing", tradeName: "Plumbing" };
+  }
+  if (/(clim|chauffage|vmc|ventilat|aération)/.test(value)) {
+    return { category: "Climate Control", tradeName: "Climate Control" };
+  }
+  if (/(piscine|pool)/.test(value)) {
+    return { category: "Pool", tradeName: "Pool" };
+  }
+  if (/(peint|façade|enduir)/.test(value)) {
+    return { category: "Finishes", tradeName: "Painting" };
+  }
+  if (/(paysage|parking|jardin|extérieur|terrasse)/.test(value)) {
+    return { category: "Landscaping", tradeName: "Landscaping" };
+  }
+  if (/(cuisine|inox|plancha|bar)/.test(value)) {
+    return { category: "Kitchen Equipment", tradeName: "Kitchen Equipment" };
+  }
+  return { category: "General Works", tradeName: "General Works" };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1468,6 +1494,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/preparations/projects/:projectId/importable-tasks", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: "Project not found." });
+
+      const [sourceTasks, groups, existingProjectTasks] = await Promise.all([
+        storage.listTasks({ locationId: project.buildingId }),
+        storage.listMaintenanceGroups(),
+        storage.listProjectTasks(),
+      ]);
+      const groupNames = new Map(groups.map(group => [group.id, group.name]));
+      const importedSourceIds = new Set(existingProjectTasks.map(task => task.sourceTaskId).filter(Boolean));
+      const eligible = sourceTasks
+        .filter(task => task.status !== "Resolved" && !importedSourceIds.has(task.id))
+        .map(task => {
+          const groupId = task.assignedGroups?.[0] || task.assignedGroup;
+          const assignedGroupName = groupId ? groupNames.get(groupId) : undefined;
+          return {
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            priority: task.priority,
+            createdAt: task.createdAt,
+            assignedGroupName,
+            ...classifyMaintenanceTask(assignedGroupName, task.title),
+          };
+        });
+      res.json(eligible);
+    } catch (error) {
+      console.error("Failed to list importable maintenance tasks:", error);
+      res.status(500).json({ error: "Failed to find maintenance tasks to import." });
+    }
+  });
+
+  app.post("/api/preparations/projects/:projectId/import-tasks", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: "Project not found." });
+      const { taskIds } = z.object({ taskIds: z.array(z.string()).min(1).max(100) }).parse(req.body);
+      const uniqueIds = Array.from(new Set(taskIds));
+      const sourceTasks = await Promise.all(uniqueIds.map(id => storage.getTask(id)));
+      if (sourceTasks.some(task => !task || task.locationId !== project.buildingId || task.status === "Resolved")) {
+        return res.status(400).json({ error: "Only open maintenance tasks from this building can be imported." });
+      }
+      const alreadyImported = await Promise.all(uniqueIds.map(id => storage.getProjectTaskBySourceTaskId(id)));
+      if (alreadyImported.some(Boolean)) {
+        return res.status(409).json({ error: "One or more selected tasks have already been imported into a preparation register." });
+      }
+
+      const groups = await storage.listMaintenanceGroups();
+      const groupNames = new Map(groups.map(group => [group.id, group.name]));
+      const trades = await storage.listTrades();
+      const tradeByName = new Map(trades.map(trade => [trade.name.trim().toLowerCase(), trade]));
+      const imported = [];
+      for (const sourceTask of sourceTasks) {
+        if (!sourceTask) continue;
+        const groupId = sourceTask.assignedGroups?.[0] || sourceTask.assignedGroup;
+        const classification = classifyMaintenanceTask(groupId ? groupNames.get(groupId) : undefined, sourceTask.title);
+        let trade = tradeByName.get(classification.tradeName.toLowerCase());
+        if (!trade) {
+          trade = await storage.createTrade({ name: classification.tradeName });
+          tradeByName.set(trade.name.trim().toLowerCase(), trade);
+        }
+        imported.push(await storage.createProjectTask({
+          projectId: project.id,
+          tradeId: trade.id,
+          category: classification.category,
+          sourceTaskId: sourceTask.id,
+          title: sourceTask.title,
+          description: sourceTask.description || undefined,
+          status: sourceTask.status === "In Progress" ? "In progress" : "Planned",
+          estimatedCost: "0",
+          actualCost: "0",
+        }));
+      }
+      res.status(201).json(imported);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      console.error("Failed to import maintenance tasks:", error);
+      res.status(500).json({ error: "Failed to import maintenance tasks." });
+    }
+  });
+
+  app.get("/api/preparations/projects/:projectId/register", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      if (!await storage.getProject(req.params.projectId)) return res.status(404).json({ error: "Project not found." });
+      const [projectTasks, trades] = await Promise.all([
+        storage.listProjectTasks(req.params.projectId),
+        storage.listTrades(),
+      ]);
+      const allQuotes = await Promise.all(projectTasks.map(task => storage.listQuotes(task.id)));
+      const taskRows = projectTasks.map((task, index) => {
+        const quotes = allQuotes[index];
+        const bestQuote = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
+        return { ...task, bestQuote, quoteCount: quotes.length };
+      });
+      const summarize = (keyFor: (task: typeof taskRows[number]) => string) => {
+        const totals = new Map<string, { estimated: number; quoted: number; actual: number; taskCount: number }>();
+        for (const task of taskRows) {
+          const key = keyFor(task);
+          const total = totals.get(key) || { estimated: 0, quoted: 0, actual: 0, taskCount: 0 };
+          total.estimated += Number(task.estimatedCost) || 0;
+          total.quoted += task.bestQuote;
+          total.actual += Number(task.actualCost) || 0;
+          total.taskCount += 1;
+          totals.set(key, total);
+        }
+        return Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual }));
+      };
+      const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
+      const totals = taskRows.reduce((total, task) => ({
+        estimated: total.estimated + (Number(task.estimatedCost) || 0),
+        quoted: total.quoted + task.bestQuote,
+        actual: total.actual + (Number(task.actualCost) || 0),
+      }), { estimated: 0, quoted: 0, actual: 0 });
+      res.json({
+        tasks: taskRows,
+        totals: { ...totals, variance: totals.estimated - totals.actual },
+        categories: summarize(task => task.category || "General Works"),
+        trades: summarize(task => task.tradeId ? tradeNames.get(task.tradeId) || "Unassigned" : "Unassigned"),
+      });
+    } catch (error) {
+      console.error("Failed to build preparation register:", error);
+      res.status(500).json({ error: "Failed to load the preparation register." });
+    }
+  });
+
   app.get("/api/preparations/project-tasks", async (req, res) => {
     try {
       if (!await requirePreparationAccess(req, res)) return;
@@ -1488,7 +1645,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
         return res.status(400).json({ error: "Costs must be non-negative numbers." });
       }
-      const data = normalizeCurrencyFields(req.body, ["estimatedCost", "actualCost"]);
+      const { sourceTaskId: _sourceTaskId, ...taskInput } = req.body;
+      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost"]);
       const task = await storage.createProjectTask(insertProjectTaskSchema.parse(data));
       res.status(201).json(task);
     } catch (error) {
@@ -1500,7 +1658,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/preparations/project-tasks/:id", async (req, res) => {
     try {
       if (!await requirePreparationAccess(req, res)) return;
-      if (!await storage.getProjectTask(req.params.id)) return res.status(404).json({ error: "Project task not found." });
+      const existingTask = await storage.getProjectTask(req.params.id);
+      if (!existingTask) return res.status(404).json({ error: "Project task not found." });
+      if (existingTask.sourceTaskId && req.body.projectId && req.body.projectId !== existingTask.projectId) {
+        return res.status(400).json({ error: "Imported maintenance tasks cannot be moved to another project." });
+      }
       if (req.body.projectId && !await storage.getProject(req.body.projectId)) {
         return res.status(404).json({ error: "Project not found." });
       }
@@ -1510,7 +1672,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
         return res.status(400).json({ error: "Costs must be non-negative numbers." });
       }
-      const data = normalizeCurrencyFields(req.body, ["estimatedCost", "actualCost"]);
+      const { sourceTaskId: _sourceTaskId, ...taskInput } = req.body;
+      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost"]);
       res.json(await storage.updateProjectTask(req.params.id, insertProjectTaskSchema.partial().parse(data)));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
@@ -1521,6 +1684,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/preparations/project-tasks/:id", async (req, res) => {
     try {
       if (!await requirePreparationAccess(req, res)) return;
+      const task = await storage.getProjectTask(req.params.id);
+      if (!task) return res.status(404).json({ error: "Project task not found." });
+      if (task.sourceTaskId) {
+        return res.status(400).json({ error: "Imported maintenance tasks remain linked for traceability and cannot be deleted. Update their status or costs instead." });
+      }
       await storage.deleteProjectTask(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -1611,40 +1779,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.listProjectTasks(),
         storage.listTrades(),
       ]);
+      const allQuotes = await Promise.all(projectTasks.map(task => storage.listQuotes(task.id)));
       const projectBuilding = new Map(projects.map(project => [project.id, project.buildingId]));
-      const buildingTotals = new Map<string, { estimated: number; actual: number }>();
-      const tradeTotals = new Map<string, { estimated: number; actual: number }>();
-      let estimated = 0;
-      let actual = 0;
+      const projectNames = new Map(projects.map(project => [project.id, project.name]));
+      const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
+      type Rollup = { estimated: number; quoted: number; actual: number; taskCount: number };
+      const addTo = (totals: Map<string, Rollup>, key: string, costs: Omit<Rollup, "taskCount">) => {
+        const total = totals.get(key) || { estimated: 0, quoted: 0, actual: 0, taskCount: 0 };
+        total.estimated += costs.estimated;
+        total.quoted += costs.quoted;
+        total.actual += costs.actual;
+        total.taskCount += 1;
+        totals.set(key, total);
+      };
+      const buildingTotals = new Map<string, Rollup>();
+      const tradeTotals = new Map<string, Rollup>();
+      const categoryTotals = new Map<string, Rollup>();
+      const projectTotals = new Map<string, Rollup>();
+      const grandTotal = { estimated: 0, quoted: 0, actual: 0 };
 
-      for (const task of projectTasks) {
+      for (let index = 0; index < projectTasks.length; index += 1) {
+        const task = projectTasks[index];
         const estimatedCost = Number(task.estimatedCost) || 0;
         const actualCost = Number(task.actualCost) || 0;
-        estimated += estimatedCost;
-        actual += actualCost;
+        const quotes = allQuotes[index];
+        const quotedCost = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
+        const costs = { estimated: estimatedCost, quoted: quotedCost, actual: actualCost };
+        grandTotal.estimated += estimatedCost;
+        grandTotal.quoted += quotedCost;
+        grandTotal.actual += actualCost;
         const buildingId = projectBuilding.get(task.projectId);
-        if (buildingId) {
-          const total = buildingTotals.get(buildingId) || { estimated: 0, actual: 0 };
-          total.estimated += estimatedCost;
-          total.actual += actualCost;
-          buildingTotals.set(buildingId, total);
-        }
-        if (task.tradeId) {
-          const total = tradeTotals.get(task.tradeId) || { estimated: 0, actual: 0 };
-          total.estimated += estimatedCost;
-          total.actual += actualCost;
-          tradeTotals.set(task.tradeId, total);
-        }
+        if (buildingId) addTo(buildingTotals, buildingId, costs);
+        addTo(projectTotals, task.projectId, costs);
+        addTo(categoryTotals, task.category || "General Works", costs);
+        addTo(tradeTotals, task.tradeId ? tradeNames.get(task.tradeId) || "Unassigned" : "Unassigned", costs);
       }
-
+      const toLines = (totals: Map<string, Rollup>) => Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual }));
       res.json({
-        grandTotal: { estimated, actual },
-        buildings: Array.from(buildingTotals, ([buildingId, total]) => ({ buildingId, ...total })),
-        trades: trades.map(trade => ({
-          tradeId: trade.id,
-          tradeName: trade.name,
-          ...(tradeTotals.get(trade.id) || { estimated: 0, actual: 0 }),
-        })),
+        grandTotal: { ...grandTotal, variance: grandTotal.estimated - grandTotal.actual },
+        buildings: toLines(buildingTotals).map(line => ({ ...line, buildingId: line.name })),
+        projects: toLines(projectTotals).map(line => ({ ...line, projectId: line.name, name: projectNames.get(line.name) || "Untitled project" })),
+        categories: toLines(categoryTotals),
+        trades: toLines(tradeTotals),
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to calculate cost rollups." });

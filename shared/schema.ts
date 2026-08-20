@@ -152,6 +152,8 @@ export const projectTasksTable = pgTable("project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
   tradeId: varchar("trade_id").references(() => tradesTable.id, { onDelete: "set null" }),
+  category: varchar("category").notNull().default("General works"),
+  sourceTaskId: varchar("source_task_id").unique().references(() => tasksTable.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   status: varchar("status").notNull().default("Planned"),
