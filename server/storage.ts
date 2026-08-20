@@ -73,6 +73,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByAuthId(authProvider: string, authId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createInitialAdmin(user: InsertUser): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   deleteUser(id: string): Promise<void>;
   updatePassword(userId: string, newPassword: string): Promise<void>;
@@ -210,6 +211,33 @@ export class PostgresStorage implements IStorage {
     
     const user = await db.insert(usersTable).values(userData).returning();
     return user[0];
+  }
+
+  async createInitialAdmin(data: InsertUser): Promise<User | undefined> {
+    const validated = insertUserSchema.parse({ ...data, role: "Admin" });
+    if (!validated.password) {
+      throw new Error("Initial administrator password is required");
+    }
+    const hashedPassword = await bcrypt.hash(validated.password, SALT_ROUNDS);
+
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(814579201)`);
+      const existingAdmin = await tx
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.role, "Admin"))
+        .limit(1);
+      if (existingAdmin.length > 0) {
+        return undefined;
+      }
+
+      const user = await tx.insert(usersTable).values({
+        ...validated,
+        password: hashedPassword,
+        role: "Admin",
+      }).returning();
+      return user[0];
+    });
   }
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {

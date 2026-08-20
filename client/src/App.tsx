@@ -80,12 +80,9 @@ function App() {
         return;
       }
       
-      // Validate session against database using secure endpoint
-      // Requires both userId AND email to match - prevents ID spoofing
+      // Validate the signed server session; local storage alone is never authority.
       fetch("/api/auth/validate-session", { 
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, email: user.email }),
         credentials: "include",
         cache: "no-store"
       })

@@ -16,6 +16,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 export function registerObjectStorageRoutes(
   app: Express,
   canReadObject?: (req: Request, objectPath: string) => Promise<boolean>,
+  canRequestUpload?: (req: Request) => Promise<boolean>,
 ): void {
   const objectStorageService = new ObjectStorageService();
 
@@ -40,6 +41,9 @@ export function registerObjectStorageRoutes(
    */
   app.post("/api/uploads/request-url", async (req, res) => {
     try {
+      if (canRequestUpload && !await canRequestUpload(req)) {
+        return res.status(401).json({ error: "Please sign in to request an upload URL." });
+      }
       const { name, size, contentType } = req.body;
 
       if (!name) {

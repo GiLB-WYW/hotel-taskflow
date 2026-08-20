@@ -51,28 +51,68 @@ async function ensureDefaultTrades() {
 
 async function ensureInitialAdmin() {
   const users = await storage.listUsers();
-  if (users.length > 0) {
+  if (users.some(user => user.role === "Admin")) {
     return;
   }
 
   const email = process.env.INITIAL_ADMIN_EMAIL;
   const password = process.env.INITIAL_ADMIN_PASSWORD;
   if (!email || !password) {
-    console.warn("No users exist. Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD as deployment secrets to provision the first administrator.");
+    const message = "No administrator exists. Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD as deployment secrets to provision an administrator.";
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(message);
+    }
+    console.warn(message);
     return;
   }
 
-  await storage.createUser({
+  const admin = await storage.createInitialAdmin({
     name: process.env.INITIAL_ADMIN_NAME || "Administrator",
     email,
     password,
     role: "Admin",
   });
-  console.log("Initial administrator provisioned from deployment secrets.");
+  if (admin) {
+    console.log("Initial administrator provisioned from deployment secrets.");
+  }
 }
 
 function hasPreparationAccess(role: string | null | undefined) {
   return role === "Admin" || role === "Coordinator";
+}
+
+function hasTaskManagementAccess(role: string | null | undefined) {
+  return hasPreparationAccess(role) || role === "Manager";
+}
+
+function canReadTask(
+  user: { id: string; role: string; group?: string | null; groups?: string[] | null },
+  task: {
+    assignedTo: string | null;
+    assignedGroup: string | null;
+    assignedGroups: string[] | null;
+    createdBy: string;
+  },
+) {
+  if (hasPreparationAccess(user.role)) {
+    return true;
+  }
+
+  if (task.createdBy === user.id || task.assignedTo === user.id) {
+    return true;
+  }
+
+  if (user.role !== "Manager") {
+    return false;
+  }
+
+  const userGroups = [user.group, ...(user.groups || [])].filter(
+    (group): group is string => Boolean(group),
+  );
+  const taskGroups = [task.assignedGroup, ...(task.assignedGroups || [])].filter(
+    (group): group is string => Boolean(group),
+  );
+  return userGroups.some(group => taskGroups.includes(group));
 }
 
 async function getSessionUser(req: Request) {
@@ -106,6 +146,15 @@ async function requireAdminAccess(req: Request, res: Response) {
   return user;
 }
 
+async function requireTaskManagementAccess(req: Request, res: Response) {
+  const user = await getSessionUser(req);
+  if (!user || !hasTaskManagementAccess(user.role)) {
+    res.status(403).json({ error: "Administrator, Coordinator, or Manager access is required to manage tasks." });
+    return null;
+  }
+  return user;
+}
+
 function normalizeCurrencyFields<T extends Record<string, unknown>>(data: T, fields: string[]): T {
   const normalized: Record<string, unknown> = { ...data };
   for (const field of fields) {
@@ -129,6 +178,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerObjectStorageRoutes(app, async (req) => {
     const user = await getSessionUser(req);
     return hasPreparationAccess(user?.role);
+  }, async (req) => {
+    return !!await getSessionUser(req);
+  });
+
+  const publicApiPaths = new Set([
+    "/auth/login",
+    "/auth/logout",
+    "/auth/validate-session",
+    "/auth/email-login",
+    "/auth/oauth",
+    "/auth/reset-password",
+  ]);
+  app.use("/api", async (req, res, next) => {
+    const isPublicInvitationLookup =
+      req.method === "GET" && /^\/invitations\/[a-f0-9]{64}$/i.test(req.path);
+    if (
+      publicApiPaths.has(req.path) ||
+      isPublicInvitationLookup ||
+      (req.method === "POST" && req.path === "/invitations/accept")
+    ) {
+      return next();
+    }
+
+    try {
+      const user = await getSessionUser(req);
+      if (!user) {
+        return res.status(401).json({ error: "Please sign in to access this resource." });
+      }
+      res.locals.authUser = user;
+      return next();
+    } catch (error) {
+      console.error("Session authorization error:", error);
+      return res.status(500).json({ error: "Unable to verify your session." });
+    }
   });
 
   // Ensure SMTR team group exists in the database
@@ -162,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tasks = await storage.listTasks({});
       const users = await storage.listUsers();
       const locations = await storage.listLocations();
-      
+
       res.json({
         status: "connected",
         environment: process.env.NODE_ENV || "unknown",
@@ -192,14 +275,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Administrator access is required to create users." });
       }
       const data = insertUserSchema.parse(req.body);
+      if (!data.password) {
+        return res.status(400).json({ error: "Password required" });
+      }
       const existingUser = await storage.getUserByEmail(data.email);
-      
+
       if (existingUser) {
         return res.status(409).json({ error: "User already exists" });
       }
 
       const user = await storage.createUser(data);
-      res.status(201).json(user);
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
@@ -227,19 +314,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("User found:", user.email, "Has password:", !!user.password);
 
-      // If user has a password, verify it
-      if (user.password) {
-        if (!password) {
-          return res.status(400).json({ error: "Password required" });
-        }
+      if (!user.password) {
+        return res.status(403).json({ error: "This account has not completed password setup. Please contact an administrator." });
+      }
+      if (!password) {
+        return res.status(400).json({ error: "Password required" });
+      }
 
-        console.log("Verifying password for user:", user.id);
-        const isValid = await storage.verifyPassword(user.id, password);
-        console.log("Password valid:", isValid);
-        
-        if (!isValid) {
-          return res.status(401).json({ error: "Invalid credentials" });
-        }
+      console.log("Verifying password for user:", user.id);
+      const isValid = await storage.verifyPassword(user.id, password);
+      console.log("Password valid:", isValid);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Don't send password hash to client
@@ -263,22 +349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session validation endpoint - verifies if stored session corresponds to real user
   app.post("/api/auth/validate-session", async (req, res) => {
     try {
-      const { userId, email } = req.body;
-      
-      if (!userId || !email) {
-        return res.status(400).json({ valid: false, error: "Missing credentials" });
-      }
-
-      // Validate that both userId and email match a real user
-      const user = await storage.getUser(userId);
-      
+      const user = await getSessionUser(req);
       if (!user) {
-        return res.json({ valid: false, error: "User not found" });
-      }
-
-      // Verify email matches to prevent ID spoofing
-      if (user.email.toLowerCase() !== email.toLowerCase()) {
-        return res.json({ valid: false, error: "Session mismatch" });
+        return res.json({ valid: false, error: "No authenticated session" });
       }
 
       // Return fresh user data (without password)
@@ -302,6 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   app.get("/api/users", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const users = await storage.listUsers();
       // Add hasPassword field to indicate if account is activated
       const usersWithStatus = users.map(user => ({
@@ -317,11 +391,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const user = await storage.getUser(req.params.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json(user);
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user" });
     }
@@ -399,50 +475,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update user profile (for logged-in user to update their own info)
   app.patch("/api/profile", async (req, res) => {
     try {
-      const { userId, name, email, provider } = req.body;
+      const { userId, name, email } = req.body;
+      const actor = await getSessionUser(req);
       
       if (!userId) {
         return res.status(400).json({ error: "User ID required" });
+      }
+      if (!actor || actor.id !== userId) {
+        return res.status(403).json({ error: "You may only update your own profile from an authenticated session." });
       }
 
       if ((!name || name.trim().length === 0) && (!email || email.trim().length === 0)) {
         return res.status(400).json({ error: "Name or email is required" });
       }
 
-      let user = await storage.getUser(userId);
-      
-      // If user doesn't exist (e.g., Google login), check if email exists
+      const user = await storage.getUser(userId);
       if (!user) {
-        // Check if a user with this email already exists
-        if (email) {
-          const existingUserByEmail = await storage.getUserByEmail(email.trim());
-          if (existingUserByEmail) {
-            // Link Google account to existing user - return existing user
-            user = existingUserByEmail;
-          }
-        }
-        
-        // If still no user found, create new one
-        if (!user) {
-          user = await storage.createUser({
-            name: name?.trim() || "User",
-            email: email?.trim() || `${userId}@oauth.local`,
-            role: "Basic Staff",
-            authProvider: provider || "google",
-            authId: userId,
-          });
-        }
-      } else {
-        // Build update object with provided fields
-        const updates: { name?: string; email?: string } = {};
-        if (name) updates.name = name.trim();
-        if (email) updates.email = email.trim();
-        
-        user = await storage.updateUser(userId, updates);
+        return res.status(404).json({ error: "User not found" });
       }
-      
+      const updates: { name?: string; email?: string } = {};
+      if (name) updates.name = name.trim();
+      if (email) updates.email = email.trim();
+      const updatedUser = await storage.updateUser(userId, updates);
       // Don't send password hash to client
-      const { password: _, ...userWithoutPassword } = user;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Profile update error:", error);
@@ -516,6 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invitations/pending", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const invitations = await storage.listPendingInvitations();
       res.json(invitations);
     } catch (error) {
@@ -592,6 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/invitations/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       await storage.deleteInvitation(req.params.id);
       res.json({ message: "Invitation deleted" });
     } catch (error) {
@@ -602,10 +660,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Resend invitation for a pending invitation (by email)
   app.post("/api/invitations/resend", async (req, res) => {
     try {
-      const { email, invitedBy } = req.body;
+      const actor = await requireAdminAccess(req, res);
+      if (!actor) return;
+      const { email } = req.body;
 
-      if (!email || !invitedBy) {
-        return res.status(400).json({ error: "Missing required fields (email, invitedBy)" });
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
       }
 
       // First check if user already exists and has a password (already activated)
@@ -636,11 +696,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invitation = await storage.updateInvitation(existingInvite.id, {
         token,
         expiresAt,
-        invitedBy,
+        invitedBy: actor.id,
       });
 
       // Get inviter info for email
-      const inviter = await storage.getUser(invitedBy);
+      const inviter = await storage.getUser(actor.id);
       const inviterName = inviter?.name || 'An administrator';
 
       // Send invitation email using the invitation data
@@ -689,6 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/categories", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const data = insertCategorySchema.parse(req.body);
       const category = await storage.createCategory(data);
       res.status(201).json(category);
@@ -702,6 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/categories/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const partialSchema = insertCategorySchema.partial();
       const data = partialSchema.parse(req.body);
       const category = await storage.updateCategory(req.params.id, data);
@@ -716,6 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/categories/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       await storage.deleteCategory(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -747,6 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/locations", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const data = insertLocationSchema.parse(req.body);
       const location = await storage.createLocation(data);
       res.status(201).json(location);
@@ -761,6 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bulk upload locations from CSV data
   app.post("/api/locations/upload", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const { locations: locationData } = req.body;
       
       if (!Array.isArray(locationData) || locationData.length === 0) {
@@ -803,6 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/locations/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const partialSchema = insertLocationSchema.partial();
       const data = partialSchema.parse(req.body);
       const location = await storage.updateLocation(req.params.id, data);
@@ -817,6 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/locations/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       await storage.deleteLocation(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -827,6 +894,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task routes
   app.get("/api/tasks", async (req, res) => {
     try {
+      const actor = await getSessionUser(req);
+      if (!actor) {
+        return res.status(401).json({ error: "Please sign in to access tasks." });
+      }
       const { locationId, status, assignedGroup, startDate, endDate } = req.query;
 
       const filters: any = {};
@@ -842,7 +913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Optimize response by replacing base64 images with thumbnails/placeholders
       // Full images can be fetched via individual task endpoints
-      const optimizedTasks = tasks.map(task => {
+      const optimizedTasks = tasks.filter(task => canReadTask(actor, task)).map(task => {
         if (task.imageUrl && task.imageUrl.startsWith('data:image')) {
           // Replace full base64 with a flag indicating image exists
           return {
@@ -879,9 +950,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/tasks/:id", async (req, res) => {
     try {
+      const actor = await getSessionUser(req);
+      if (!actor) {
+        return res.status(401).json({ error: "Please sign in to access tasks." });
+      }
       const task = await storage.getTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
+      }
+      if (!canReadTask(actor, task)) {
+        return res.status(403).json({ error: "You do not have access to this task." });
       }
       res.json(task);
     } catch (error) {
@@ -892,9 +970,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint to get task thumbnail image
   app.get("/api/tasks/:id/thumbnail", async (req, res) => {
     try {
+      const actor = await getSessionUser(req);
+      if (!actor) {
+        return res.status(401).json({ error: "Please sign in to access tasks." });
+      }
       const task = await storage.getTask(req.params.id);
       if (!task || !task.imageUrl) {
         return res.status(404).json({ error: "Image not found" });
+      }
+      if (!canReadTask(actor, task)) {
+        return res.status(403).json({ error: "You do not have access to this task." });
       }
       
       // If it's a base64 image, convert and send
@@ -935,6 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tasks", async (req, res) => {
     try {
+      if (!await requireTaskManagementAccess(req, res)) return;
       console.log("Creating task with data:", { ...req.body, imageUrl: req.body.imageUrl ? `[image: ${req.body.imageUrl.substring(0, 50)}...]` : null });
       const data = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(data);
@@ -952,6 +1038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tasks/:id", async (req, res) => {
     try {
+      if (!await requireTaskManagementAccess(req, res)) return;
       const partialSchema = insertTaskSchema.partial();
       const data = partialSchema.parse(req.body);
       
@@ -1023,6 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/tasks/:id", async (req, res) => {
     try {
+      if (!await requireTaskManagementAccess(req, res)) return;
       await storage.deleteTask(req.params.id);
       res.json({ success: true, message: "Task deleted successfully" });
     } catch (error) {
@@ -1033,28 +1121,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notes routes
   app.post("/api/tasks/:taskId/notes", async (req, res) => {
     try {
-      const { content, createdBy, recipients } = req.body;
+      const actor = await requireTaskManagementAccess(req, res);
+      if (!actor) return;
+      const { content, recipients } = req.body;
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const recipientIds = Array.isArray(recipients)
+        ? recipients
+            .filter((recipient): recipient is string => typeof recipient === "string")
+            .filter((recipient, index, list) => list.indexOf(recipient) === index)
+        : [];
       const noteData = {
         taskId: req.params.taskId,
         content,
-        createdBy,
-        recipients: recipients || [],
+        createdBy: actor.id,
+        recipients: recipientIds,
       };
       const note = await storage.createNote(noteData);
       
-      // Get task and creator info for notification
-      const task = await storage.getTask(req.params.taskId);
-      const creator = await storage.getUser(createdBy);
-      
       // Notify all recipients
-      if (recipients && recipients.length > 0 && task) {
-        for (const recipientId of recipients) {
-          if (recipientId !== createdBy) {
+      if (recipientIds.length > 0) {
+        for (const recipientId of recipientIds) {
+          if (recipientId !== actor.id) {
             await storage.createNotification({
               userId: recipientId,
               type: "note_added",
               title: "New Note Added",
-              message: `${creator?.name || 'Someone'} added a note to task: ${task.title}`,
+              message: `${actor.name} added a note to task: ${task.title}`,
               taskId: req.params.taskId,
               isRead: false,
             });
@@ -1063,12 +1158,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Also notify the assigned user if not the creator and not in recipients
-      if (task?.assignedTo && task.assignedTo !== createdBy && !recipients?.includes(task.assignedTo)) {
+      if (task.assignedTo && task.assignedTo !== actor.id && !recipientIds.includes(task.assignedTo)) {
         await storage.createNotification({
           userId: task.assignedTo,
           type: "note_added",
           title: "New Note on Your Task",
-          message: `${creator?.name || 'Someone'} added a note to: ${task.title}`,
+          message: `${actor.name} added a note to: ${task.title}`,
           taskId: req.params.taskId,
           isRead: false,
         });
@@ -1085,8 +1180,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/tasks/:taskId/notes", async (req, res) => {
     try {
+      const actor = await getSessionUser(req);
+      if (!actor) {
+        return res.status(401).json({ error: "Please sign in to access task notes." });
+      }
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
       const notes = await storage.listNotesByTask(req.params.taskId);
-      res.json(notes);
+      if (canReadTask(actor, task)) {
+        return res.json(notes);
+      }
+
+      const recipientNotes = notes.filter(note =>
+        note.createdBy === actor.id || note.recipients?.includes(actor.id),
+      );
+      if (recipientNotes.length === 0) {
+        return res.status(403).json({ error: "You do not have access to these task notes." });
+      }
+      res.json(recipientNotes);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch notes" });
     }
@@ -1124,6 +1237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/maintenance-groups", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const data = insertMaintenanceGroupSchema.parse(req.body);
       const group = await storage.createMaintenanceGroup(data);
       res.status(201).json(group);
@@ -1137,6 +1251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/maintenance-groups/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       const partialSchema = insertMaintenanceGroupSchema.partial();
       const data = partialSchema.parse(req.body);
       const group = await storage.updateMaintenanceGroup(req.params.id, data);
@@ -1151,6 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/maintenance-groups/:id", async (req, res) => {
     try {
+      if (!await requireAdminAccess(req, res)) return;
       await storage.deleteMaintenanceGroup(req.params.id);
       res.json({ message: "Maintenance group deleted successfully" });
     } catch (error) {
