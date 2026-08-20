@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+type GoogleIdentity = {
+  accounts: {
+    id: {
+      initialize(options: { client_id: string; callback: (response: { credential: string }) => void }): void;
+      renderButton(element: HTMLElement, options: Record<string, string | number>): void;
+    };
+  };
+};
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -13,6 +22,121 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  const handleGoogleCredential = useCallback(async (response: { credential: string }) => {
+    setIsLoading(true);
+
+    try {
+      const result = await fetch("/api/auth/oauth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          authProvider: "google",
+          credential: response.credential,
+        }),
+      });
+
+      const data = await result.json();
+      if (!result.ok) {
+        toast({
+          title: "Google Sign-In Failed",
+          description: data.error || "Unable to sign in with Google.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      localStorage.setItem("user", JSON.stringify({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        group: data.group,
+        provider: data.authProvider || "google",
+        avatar: data.avatar || data.email?.[0]?.toUpperCase(),
+      }));
+
+      toast({
+        title: "Login Successful",
+        description: `Welcome, ${data.name}!`,
+      });
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Google login error:", error);
+      toast({
+        title: "Google Sign-In Failed",
+        description: "Unable to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/auth/google/config", { credentials: "same-origin" })
+      .then((response) => response.json())
+      .then((config: { enabled?: boolean; clientId?: string | null }) => {
+        if (!cancelled && config.enabled && config.clientId) {
+          setGoogleConfigured(true);
+          setGoogleClientId(config.clientId);
+        }
+      })
+      .catch((error) => console.error("Google configuration lookup failed:", error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    const renderGoogleButton = () => {
+      const google = (window as Window & { google?: GoogleIdentity }).google;
+      if (!google || !googleButtonRef.current) return;
+
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+      });
+      google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        text: "signin_with",
+        shape: "rectangular",
+        width: 360,
+      });
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+    if (existingScript) {
+      if ((window as Window & { google?: GoogleIdentity }).google) {
+        renderGoogleButton();
+      } else {
+        existingScript.addEventListener("load", renderGoogleButton, { once: true });
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", renderGoogleButton, { once: true });
+    document.head.appendChild(script);
+  }, [googleClientId, handleGoogleCredential]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +323,21 @@ export default function Login() {
                 {isLoading ? "Signing in..." : "Sign In with Email"}
               </Button>
             </form>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-xs text-[#A6A6A6]">
+                <div className="h-px flex-1 bg-[#D9DDD6]" />
+                <span>OR</span>
+                <div className="h-px flex-1 bg-[#D9DDD6]" />
+              </div>
+              {googleConfigured ? (
+                <div ref={googleButtonRef} className="flex min-h-10 justify-center" />
+              ) : (
+                <p className="text-center text-xs text-[#6F848E]">
+                  Google sign-in is being configured. Use your email and password for now.
+                </p>
+              )}
+            </div>
 
             <p className="text-center text-xs text-[#6F848E]">
               Use the password created during account setup, or accept an invitation first.

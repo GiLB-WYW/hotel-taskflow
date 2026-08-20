@@ -17,6 +17,7 @@ import {
 import { z } from "zod";
 import { sendInvitationEmail } from "./email";
 import crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 
@@ -188,6 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/auth/validate-session",
     "/auth/email-login",
     "/auth/oauth",
+    "/auth/google/config",
     "/auth/reset-password",
   ]);
   app.use("/api", async (req, res, next) => {
@@ -363,13 +365,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/auth/google/config", (_req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    res.json({
+      enabled: Boolean(clientId),
+      clientId: clientId || null,
+    });
+  });
+
   // Do not treat an arbitrary email address as an authenticated identity.
   app.post("/api/auth/email-login", async (req, res) => {
     res.status(410).json({ error: "Password sign-in is required. Complete an invitation or use your account password." });
   });
 
   app.post("/api/auth/oauth", async (req, res) => {
-    res.status(410).json({ error: "OAuth sign-in is unavailable until identity-token verification is configured." });
+    try {
+      const { authProvider, credential } = req.body;
+      if (authProvider !== "google" || typeof credential !== "string" || !credential) {
+        return res.status(400).json({ error: "A verified Google sign-in credential is required." });
+      }
+
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        return res.status(503).json({ error: "Google sign-in is not configured yet." });
+      }
+
+      const googleClient = new OAuth2Client(clientId);
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      const payload = ticket.getPayload();
+      const email = payload?.email?.trim().toLowerCase();
+      const authId = payload?.sub;
+
+      if (!email || !authId || payload?.email_verified !== true) {
+        return res.status(401).json({ error: "Google did not provide a verified email address." });
+      }
+
+      let user = await storage.getUserByAuthId("google", authId);
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+      }
+
+      if (!user) {
+        return res.status(403).json({
+          error: "This Google account is not registered. Please ask an administrator for an invitation first.",
+        });
+      }
+
+      user = await storage.updateUser(user.id, {
+        authProvider: "google",
+        authId,
+        avatar: payload.picture || user.avatar || null,
+      });
+
+      req.session.userId = user.id;
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Google OAuth verification error:", error);
+      res.status(401).json({ error: "Google sign-in could not be verified." });
+    }
   });
 
   // User routes
