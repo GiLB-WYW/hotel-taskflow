@@ -25,6 +25,11 @@ export default function Login() {
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement>(null);
+  const toastRef = useRef(toast);
+
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
 
   const handleGoogleCredential = useCallback(async (response: { credential: string }) => {
     setIsLoading(true);
@@ -45,7 +50,7 @@ export default function Login() {
 
       const data = await result.json();
       if (!result.ok) {
-        toast({
+        toastRef.current({
           title: "Google Sign-In Failed",
           description: data.error || "Unable to sign in with Google.",
           variant: "destructive",
@@ -63,14 +68,14 @@ export default function Login() {
         avatar: data.avatar || data.email?.[0]?.toUpperCase(),
       }));
 
-      toast({
+      toastRef.current({
         title: "Login Successful",
         description: `Welcome, ${data.name}!`,
       });
       window.location.replace("/");
     } catch (error) {
       console.error("Google login error:", error);
-      toast({
+      toastRef.current({
         title: "Google Sign-In Failed",
         description: "Unable to connect to the server. Please try again.",
         variant: "destructive",
@@ -78,7 +83,7 @@ export default function Login() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +110,7 @@ export default function Login() {
       const google = (window as Window & { google?: GoogleIdentity }).google;
       if (!google || !googleButtonRef.current) return;
 
+      googleButtonRef.current.innerHTML = "";
       google.accounts.id.initialize({
         client_id: googleClientId,
         callback: handleGoogleCredential,
