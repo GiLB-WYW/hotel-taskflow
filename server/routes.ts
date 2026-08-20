@@ -20,6 +20,7 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
+import { preparationScope2026 } from "./preparationScope";
 
 async function ensureSmtrGroup() {
   try {
@@ -198,6 +199,19 @@ function classifyMaintenanceTask(groupName?: string | null, title?: string | nul
     return { category: "Kitchen Equipment", tradeName: "Kitchen Equipment" };
   }
   return { category: "General Works", tradeName: "General Works" };
+}
+
+function normalizedText(value?: string | null) {
+  return (value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function scopeMatchesLocation(scopeBuilding: string, location: { name: string; category: string; code?: string | null }) {
+  const building = normalizedText(scopeBuilding);
+  const locationText = normalizedText(`${location.name} ${location.category} ${location.code || ""}`);
+  if (building === "paysage") return /(jardin|exterieur|terrasse|parking)/.test(locationText);
+  if (building === "retarddepaiement") return true;
+  if (building === "laguinguette") return /(guinguette|bar|piscine|restaurant)/.test(locationText);
+  return locationText.includes(building);
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1494,6 +1508,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/preparations/projects/:projectId/source-scope", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: "Project not found." });
+      const location = await storage.getLocation(project.buildingId);
+      if (!location) return res.status(404).json({ error: "Project location not found." });
+      const existing = await storage.listProjectTasks();
+      const imported = new Set(existing.map(task => task.sourceReference).filter(Boolean));
+      res.json(preparationScope2026
+        .filter(item => scopeMatchesLocation(item.building, location))
+        .map(item => ({ ...item, sourceDocument: "Travaux 2026 - Cahier de charges", imported: imported.has(`travaux-2026:${item.id}`) })));
+    } catch (error) {
+      console.error("Failed to load preparation source scope:", error);
+      res.status(500).json({ error: "Failed to load the 2026 work scope." });
+    }
+  });
+
+  app.post("/api/preparations/projects/:projectId/import-source-scope", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: "Project not found." });
+      const location = await storage.getLocation(project.buildingId);
+      if (!location) return res.status(404).json({ error: "Project location not found." });
+      const { itemIds } = z.object({ itemIds: z.array(z.string()).min(1).max(100) }).parse(req.body);
+      const sourceItems = Array.from(new Set(itemIds)).map(id => preparationScope2026.find(item => item.id === id));
+      if (sourceItems.some(item => !item || !scopeMatchesLocation(item.building, location))) {
+        return res.status(400).json({ error: "Selected source rows do not belong to this preparation location." });
+      }
+      const existing = await storage.listProjectTasks();
+      const existingReferences = new Set(existing.map(task => task.sourceReference).filter(Boolean));
+      if (sourceItems.some(item => existingReferences.has(`travaux-2026:${item!.id}`))) {
+        return res.status(409).json({ error: "One or more selected PDF rows are already in the register." });
+      }
+      const trades = await storage.listTrades();
+      const tradeByName = new Map(trades.map(trade => [trade.name.toLowerCase(), trade]));
+      const imported = [];
+      for (const sourceItem of sourceItems) {
+        if (!sourceItem) continue;
+        let trade = tradeByName.get(sourceItem.tradeName.toLowerCase());
+        if (!trade) {
+          trade = await storage.createTrade({ name: sourceItem.tradeName });
+          tradeByName.set(trade.name.toLowerCase(), trade);
+        }
+        imported.push(await storage.createProjectTask({
+          projectId: project.id,
+          tradeId: trade.id,
+          category: sourceItem.category,
+          title: sourceItem.title,
+          supplierName: sourceItem.supplierName,
+          plannedFor: sourceItem.plannedFor,
+          sourceDocument: "Travaux 2026 - Cahier de charges",
+          sourceReference: `travaux-2026:${sourceItem.id}`,
+          quantity: sourceItem.quantity,
+          unitPrice: sourceItem.estimatedCost,
+          estimatedCost: sourceItem.estimatedCost || "0",
+          invoiceNumber: sourceItem.invoiceNumber,
+          invoiceAmount: sourceItem.invoiceAmount,
+          actualCost: sourceItem.invoiceAmount || "0",
+          status: "Planned",
+        }));
+      }
+      res.status(201).json(imported);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      console.error("Failed to import preparation source scope:", error);
+      res.status(500).json({ error: "Failed to import the 2026 work scope." });
+    }
+  });
+
+  app.post("/api/preparations/import-all-maintenance-tasks", async (req, res) => {
+    try {
+      const user = await requirePreparationAccess(req, res);
+      if (!user) return;
+      const [sourceTasks, locations, groups, projects, projectTasks, trades] = await Promise.all([
+        storage.listTasks({}),
+        storage.listLocations(),
+        storage.listMaintenanceGroups(),
+        storage.listProjects(),
+        storage.listProjectTasks(),
+        storage.listTrades(),
+      ]);
+      const importedSourceIds = new Set(projectTasks.map(task => task.sourceTaskId).filter(Boolean));
+      const locationsById = new Map(locations.map(location => [location.id, location]));
+      const groupsById = new Map(groups.map(group => [group.id, group.name]));
+      const projectByLocation = new Map(projects.map(project => [project.buildingId, project]));
+      const tradeByName = new Map(trades.map(trade => [trade.name.toLowerCase(), trade]));
+      const imported = [];
+      const skipped = [];
+      for (const sourceTask of sourceTasks) {
+        if (sourceTask.status === "Resolved" || importedSourceIds.has(sourceTask.id)) { skipped.push(sourceTask.id); continue; }
+        const location = locationsById.get(sourceTask.locationId);
+        if (!location) { skipped.push(sourceTask.id); continue; }
+        let project = projectByLocation.get(location.id);
+        if (!project) {
+          project = await storage.createProject({
+            buildingId: location.id,
+            name: `Maintenance register · ${location.name}`,
+            description: "Historical maintenance tasks imported for procurement tracking.",
+            status: "Planning",
+            createdBy: user.id,
+          });
+          projectByLocation.set(location.id, project);
+        }
+        const groupId = sourceTask.assignedGroups?.[0] || sourceTask.assignedGroup;
+        const classification = classifyMaintenanceTask(groupId ? groupsById.get(groupId) : undefined, sourceTask.title);
+        let trade = tradeByName.get(classification.tradeName.toLowerCase());
+        if (!trade) {
+          trade = await storage.createTrade({ name: classification.tradeName });
+          tradeByName.set(trade.name.toLowerCase(), trade);
+        }
+        imported.push(await storage.createProjectTask({
+          projectId: project.id,
+          tradeId: trade.id,
+          category: classification.category,
+          sourceTaskId: sourceTask.id,
+          title: sourceTask.title,
+          productDescription: sourceTask.description || undefined,
+          sourceDocument: "Maintenance app",
+          status: sourceTask.status === "In Progress" ? "In progress" : "Planned",
+          estimatedCost: "0",
+          actualCost: "0",
+        }));
+      }
+      res.status(201).json({ importedCount: imported.length, skippedCount: skipped.length, projects: Array.from(projectByLocation.values()) });
+    } catch (error) {
+      console.error("Failed to import historical maintenance tasks:", error);
+      res.status(500).json({ error: "Failed to import historical maintenance tasks." });
+    }
+  });
+
   app.get("/api/preparations/projects/:projectId/importable-tasks", async (req, res) => {
     try {
       if (!await requirePreparationAccess(req, res)) return;
@@ -1592,16 +1738,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskRows = projectTasks.map((task, index) => {
         const quotes = allQuotes[index];
         const bestQuote = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
-        return { ...task, bestQuote, quoteCount: quotes.length };
+        const unitPrice = task.unitPrice === null ? null : Number(task.unitPrice);
+        const quantity = task.quantity === null ? null : Number(task.quantity);
+        const lineTotal = unitPrice !== null && quantity !== null ? unitPrice * quantity : Number(task.estimatedCost) || 0;
+        const invoiceAmount = task.invoiceAmount === null ? null : Number(task.invoiceAmount);
+        return { ...task, unitPrice, quantity, lineTotal, invoiceAmount, bestQuote, quoteCount: quotes.length };
       });
       const summarize = (keyFor: (task: typeof taskRows[number]) => string) => {
         const totals = new Map<string, { estimated: number; quoted: number; actual: number; taskCount: number }>();
         for (const task of taskRows) {
           const key = keyFor(task);
           const total = totals.get(key) || { estimated: 0, quoted: 0, actual: 0, taskCount: 0 };
-          total.estimated += Number(task.estimatedCost) || 0;
+          total.estimated += task.lineTotal;
           total.quoted += task.bestQuote;
-          total.actual += Number(task.actualCost) || 0;
+          total.actual += task.invoiceAmount ?? (Number(task.actualCost) || 0);
           total.taskCount += 1;
           totals.set(key, total);
         }
@@ -1609,9 +1759,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
       const totals = taskRows.reduce((total, task) => ({
-        estimated: total.estimated + (Number(task.estimatedCost) || 0),
+        estimated: total.estimated + task.lineTotal,
         quoted: total.quoted + task.bestQuote,
-        actual: total.actual + (Number(task.actualCost) || 0),
+        actual: total.actual + (task.invoiceAmount ?? (Number(task.actualCost) || 0)),
       }), { estimated: 0, quoted: 0, actual: 0 });
       res.json({
         tasks: taskRows,
@@ -1642,11 +1792,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.tradeId && !(await storage.listTrades()).some(trade => trade.id === req.body.tradeId)) {
         return res.status(404).json({ error: "Trade not found." });
       }
-      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
+      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost", "unitPrice", "quantity", "invoiceAmount"])) {
         return res.status(400).json({ error: "Costs must be non-negative numbers." });
       }
       const { sourceTaskId: _sourceTaskId, ...taskInput } = req.body;
-      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost"]);
+      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost", "unitPrice", "quantity", "invoiceAmount"]);
       const task = await storage.createProjectTask(insertProjectTaskSchema.parse(data));
       res.status(201).json(task);
     } catch (error) {
@@ -1669,11 +1819,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.tradeId && !(await storage.listTrades()).some(trade => trade.id === req.body.tradeId)) {
         return res.status(404).json({ error: "Trade not found." });
       }
-      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost"])) {
+      if (!hasValidNonNegativeCurrency(req.body, ["estimatedCost", "actualCost", "unitPrice", "quantity", "invoiceAmount"])) {
         return res.status(400).json({ error: "Costs must be non-negative numbers." });
       }
       const { sourceTaskId: _sourceTaskId, ...taskInput } = req.body;
-      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost"]);
+      const data = normalizeCurrencyFields(taskInput, ["estimatedCost", "actualCost", "unitPrice", "quantity", "invoiceAmount"]);
       res.json(await storage.updateProjectTask(req.params.id, insertProjectTaskSchema.partial().parse(data)));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
@@ -1800,8 +1950,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (let index = 0; index < projectTasks.length; index += 1) {
         const task = projectTasks[index];
-        const estimatedCost = Number(task.estimatedCost) || 0;
-        const actualCost = Number(task.actualCost) || 0;
+        const unitPrice = task.unitPrice === null ? null : Number(task.unitPrice);
+        const quantity = task.quantity === null ? null : Number(task.quantity);
+        const estimatedCost = unitPrice !== null && quantity !== null
+          ? unitPrice * quantity
+          : Number(task.estimatedCost) || 0;
+        const actualCost = task.invoiceAmount === null
+          ? Number(task.actualCost) || 0
+          : Number(task.invoiceAmount);
         const quotes = allQuotes[index];
         const quotedCost = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
         const costs = { estimated: estimatedCost, quoted: quotedCost, actual: actualCost };

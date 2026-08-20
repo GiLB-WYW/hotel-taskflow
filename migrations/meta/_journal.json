@@ -15,6 +15,13 @@
       "when": 1787310000000,
       "tag": "0001_preparation_work_register",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787313600000,
+      "tag": "0002_preparation_procurement_register",
+      "breakpoints": true
     }
   ]
 }
