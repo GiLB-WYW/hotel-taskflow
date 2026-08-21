@@ -45,6 +45,7 @@ const DEFAULT_CATEGORY = "General Works";
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, { ...options, credentials: "include" });
+  if (response.status === 401) throw new Error("Session expired — please refresh the page and sign in again.");
   if (!response.ok) throw new Error((await response.text()) || "Request failed");
   return response.status === 204 ? (undefined as T) : response.json();
 }
@@ -323,7 +324,9 @@ export default function Preparations() {
         invoiceFileName = invoiceFile.name;
         invoiceFileUrl = await uploadPreparationPdf(invoiceFile);
       }
-      const payload = { projectId, title: form.title, description: form.description || undefined, productDescription: form.productDescription || undefined, supplierName: form.supplierName || undefined, category: form.category || DEFAULT_CATEGORY, tradeId: form.tradeId || undefined, plannedFor: form.plannedFor || undefined, status: form.status || "Planned", unitPrice: Number(form.unitPrice || 0), quantity: Number(form.quantity || 0), estimatedCost: Number(form.estimatedCost || 0), invoiceNumber: form.invoiceNumber || undefined, invoiceAmount: Number(form.invoiceAmount || 0), invoiceFileName: invoiceFileName || undefined, invoiceFileUrl: invoiceFileUrl || undefined, actualCost: Number(form.actualCost || 0) };
+      // When editing an existing task, preserve its own projectId (the state's projectId is for new tasks)
+      const effectiveProjectId = editingTask ? editingTask.projectId : projectId;
+      const payload = { projectId: effectiveProjectId, title: form.title, description: form.description || undefined, productDescription: form.productDescription || undefined, supplierName: form.supplierName || undefined, category: form.category || DEFAULT_CATEGORY, tradeId: form.tradeId || undefined, plannedFor: form.plannedFor || undefined, status: form.status || "Planned", unitPrice: Number(form.unitPrice || 0), quantity: Number(form.quantity || 0), estimatedCost: Number(form.estimatedCost || 0), invoiceNumber: form.invoiceNumber || undefined, invoiceAmount: form.invoiceAmount !== "" && form.invoiceAmount !== undefined ? Number(form.invoiceAmount) : 0, invoiceFileName: invoiceFileName || undefined, invoiceFileUrl: invoiceFileUrl || undefined, actualCost: Number(form.actualCost || 0) };
       return editingTask ? api(`/api/preparations/project-tasks/${editingTask.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }) : api("/api/preparations/project-tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     },
     onSuccess: () => { invalidateRegister(); closeDialog(); toast({ title: editingTask ? "Line updated" : "Line added" }); }, onError: (error: Error) => fail(error),
