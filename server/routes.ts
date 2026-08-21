@@ -1947,6 +1947,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categoryTotals = new Map<string, Rollup>();
       const projectTotals = new Map<string, Rollup>();
       const grandTotal = { estimated: 0, quoted: 0, actual: 0 };
+      type TaskSummary = {
+        id: string; title: string; description?: string | null; productDescription?: string | null;
+        projectId: string; projectName: string; buildingId: string;
+        supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
+        estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
+        invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
+        plannedFor?: string | null; sourceTaskId?: string | null; tradeId?: string | null;
+        category: string; status?: string | null;
+      };
+      const categoryTasks = new Map<string, TaskSummary[]>();
+      const tradeTasks = new Map<string, TaskSummary[]>();
 
       for (let index = 0; index < projectTasks.length; index += 1) {
         const task = projectTasks[index];
@@ -1967,16 +1978,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const buildingId = projectBuilding.get(task.projectId);
         if (buildingId) addTo(buildingTotals, buildingId, costs);
         addTo(projectTotals, task.projectId, costs);
-        addTo(categoryTotals, task.category || "General Works", costs);
-        addTo(tradeTotals, task.tradeId ? tradeNames.get(task.tradeId) || "Unassigned" : "Unassigned", costs);
+        const catKey = task.category || "General Works";
+        const tradeKey = task.tradeId ? tradeNames.get(task.tradeId) || "Unassigned" : "Unassigned";
+        addTo(categoryTotals, catKey, costs);
+        addTo(tradeTotals, tradeKey, costs);
+        const summary: TaskSummary = {
+          id: task.id, title: task.title, description: task.description,
+          productDescription: task.productDescription,
+          projectId: task.projectId, projectName: projectNames.get(task.projectId) || "Untitled",
+          buildingId: buildingId || "",
+          supplierName: task.supplierName, unitPrice, quantity,
+          lineTotal: unitPrice !== null && quantity !== null ? unitPrice * quantity : null,
+          estimatedCost, actualCost,
+          invoiceAmount: task.invoiceAmount === null ? null : Number(task.invoiceAmount),
+          invoiceNumber: task.invoiceNumber, invoiceFileUrl: task.invoiceFileUrl,
+          invoiceFileName: task.invoiceFileName, plannedFor: task.plannedFor,
+          sourceTaskId: task.sourceTaskId, tradeId: task.tradeId, category: catKey, status: task.status,
+        };
+        if (!categoryTasks.has(catKey)) categoryTasks.set(catKey, []);
+        categoryTasks.get(catKey)!.push(summary);
+        if (!tradeTasks.has(tradeKey)) tradeTasks.set(tradeKey, []);
+        tradeTasks.get(tradeKey)!.push(summary);
       }
-      const toLines = (totals: Map<string, Rollup>) => Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual }));
+      const toLines = (totals: Map<string, Rollup>, tasksMap?: Map<string, TaskSummary[]>) =>
+        Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual, tasks: tasksMap?.get(name) ?? [] }));
       res.json({
         grandTotal: { ...grandTotal, variance: grandTotal.estimated - grandTotal.actual },
         buildings: toLines(buildingTotals).map(line => ({ ...line, buildingId: line.name })),
         projects: toLines(projectTotals).map(line => ({ ...line, projectId: line.name, name: projectNames.get(line.name) || "Untitled project" })),
-        categories: toLines(categoryTotals),
-        trades: toLines(tradeTotals),
+        categories: toLines(categoryTotals, categoryTasks),
+        trades: toLines(tradeTotals, tradeTasks),
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to calculate cost rollups." });

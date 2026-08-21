@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import { Calculator, ClipboardList, FileText, FolderInput, Loader2, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, UploadCloud, Users } from "lucide-react";
+import { Calculator, ChevronDown, ChevronRight, ClipboardList, FileText, FolderInput, Loader2, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, UploadCloud, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,16 @@ type RegisterTask = {
   sourceDocument?: string | null; invoiceNumber?: string | null; invoiceAmount?: number | null; invoiceFileName?: string | null; invoiceFileUrl?: string | null;
   status?: string; estimatedCost?: number; actualCost?: number; bestQuote: number; quoteCount: number;
 };
-type BudgetLine = { name: string; estimated: number; quoted: number; actual: number; variance: number; taskCount: number };
+type RollupTask = {
+  id: string; title: string; description?: string | null; productDescription?: string | null;
+  projectId: string; projectName: string; buildingId: string;
+  supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
+  estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
+  invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
+  plannedFor?: string | null; sourceTaskId?: string | null; tradeId?: string | null;
+  category: string; status?: string | null;
+};
+type BudgetLine = { name: string; estimated: number; quoted: number; actual: number; variance: number; taskCount: number; tasks?: RollupTask[] };
 type Register = { tasks: RegisterTask[]; totals: Omit<BudgetLine, "name" | "taskCount">; categories: BudgetLine[]; trades: BudgetLine[] };
 type Quote = { id: string; supplierName: string; amount: number; fileName?: string; fileUrl?: string };
 type ImportableTask = { id: string; title: string; description?: string; status: string; priority: string; assignedGroupName?: string; category: string; tradeName: string };
@@ -46,6 +55,121 @@ function BudgetTable({ lines }: { lines: BudgetLine[] }) {
     <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="pb-2 font-medium">Group</th><th className="pb-2 text-right font-medium">Lines</th><th className="pb-2 text-right font-medium">Planned</th><th className="pb-2 text-right font-medium">Best quote</th><th className="pb-2 text-right font-medium">Actual</th><th className="pb-2 text-right font-medium">Variance</th></tr></thead>
     <tbody>{lines.map(line => <tr key={line.name} className="border-b last:border-0"><td className="py-3 font-medium">{line.name}</td><td className="py-3 text-right text-muted-foreground">{line.taskCount}</td><td className="py-3 text-right">{money(line.estimated)}</td><td className="py-3 text-right">{money(line.quoted)}</td><td className="py-3 text-right">{money(line.actual)}</td><td className={`py-3 text-right font-medium ${line.variance < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(line.variance)}</td></tr>)}</tbody>
   </table></div>;
+}
+
+function ExpandableBudgetTable({ lines, onPatch, onEdit }: {
+  lines: BudgetLine[];
+  onPatch: (id: string, data: Record<string, unknown>) => void;
+  onEdit: (task: RollupTask) => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
+  const toggle = (name: string) => setExpanded(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px] text-sm">
+        <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+          <tr><th className="w-7 pb-2" /><th className="pb-2 font-medium">Group</th><th className="pb-2 text-right font-medium">Lines</th><th className="pb-2 text-right font-medium">Planned</th><th className="pb-2 text-right font-medium">Best quote</th><th className="pb-2 text-right font-medium">Actual</th><th className="pb-2 text-right font-medium">Variance</th></tr>
+        </thead>
+        <tbody>
+          {lines.map(line => {
+            const isOpen = expanded.has(line.name);
+            const tasks = line.tasks ?? [];
+            return (
+              <tr key={line.name} className="border-b last:border-0">
+                <td colSpan={7} className="p-0">
+                  <button type="button" onClick={() => toggle(line.name)} className="flex w-full items-center gap-0 text-left hover:bg-muted/30">
+                    <span className="w-7 shrink-0 py-3 pl-1">{isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}</span>
+                    <span className="flex-1 py-3 font-medium">{line.name}</span>
+                    <span className="w-16 py-3 text-right text-muted-foreground">{line.taskCount}</span>
+                    <span className="w-24 py-3 text-right">{money(line.estimated)}</span>
+                    <span className="w-24 py-3 text-right">{money(line.quoted)}</span>
+                    <span className="w-24 py-3 text-right">{money(line.actual)}</span>
+                    <span className={`w-24 py-3 text-right font-medium ${line.variance < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(line.variance)}</span>
+                  </button>
+                  {isOpen && tasks.length > 0 && (
+                    <div className="border-t bg-muted/10 pb-3 pt-1">
+                      <div className="overflow-x-auto pl-7 pr-2">
+                        <table className="w-full min-w-[700px] text-xs">
+                          <thead>
+                            <tr className="border-b text-muted-foreground">
+                              <th className="py-2 text-left font-medium">Task</th>
+                              <th className="py-2 text-left font-medium">Project</th>
+                              <th className="py-2 text-left font-medium">Supplier</th>
+                              <th className="py-2 text-right font-medium">Planned</th>
+                              <th className="py-2 text-left font-medium">Invoice #</th>
+                              <th className="py-2 text-right font-medium">Invoice amt</th>
+                              <th className="py-2 font-medium" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tasks.map(task => (
+                              <tr key={task.id} className="border-b last:border-0">
+                                <td className="py-2 pr-3">
+                                  <div className="flex max-w-[200px] flex-wrap items-center gap-1">
+                                    <span className="font-medium leading-tight">{task.title}</span>
+                                    {task.sourceTaskId && <Badge variant="outline" className="text-[9px]">App task</Badge>}
+                                  </div>
+                                  {task.plannedFor && <p className="mt-0.5 text-muted-foreground">{task.plannedFor}</p>}
+                                </td>
+                                <td className="py-2 pr-3 text-muted-foreground">{task.projectName}</td>
+                                <td className="py-2 pr-2">
+                                  <input
+                                    className="h-7 w-28 rounded border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                    defaultValue={task.supplierName ?? ""}
+                                    placeholder="Pending"
+                                    onBlur={e => { if (e.target.value !== (task.supplierName ?? "")) onPatch(task.id, { supplierName: e.target.value || null }); }}
+                                  />
+                                </td>
+                                <td className="py-2 pr-3 text-right">
+                                  {task.lineTotal !== null && task.lineTotal !== undefined ? money(task.lineTotal) : money(task.estimatedCost)}
+                                </td>
+                                <td className="py-2 pr-2">
+                                  <input
+                                    className="h-7 w-28 rounded border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                    defaultValue={task.invoiceNumber ?? ""}
+                                    placeholder="Invoice ref"
+                                    onBlur={e => { if (e.target.value !== (task.invoiceNumber ?? "")) onPatch(task.id, { invoiceNumber: e.target.value || null }); }}
+                                  />
+                                </td>
+                                <td className="py-2 pr-2">
+                                  <input
+                                    type="number" min="0"
+                                    className="h-7 w-24 rounded border bg-background px-2 text-right text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                    defaultValue={task.invoiceAmount ?? task.actualCost ?? ""}
+                                    onBlur={e => {
+                                      const cur = String(task.invoiceAmount ?? task.actualCost ?? "");
+                                      if (e.target.value !== cur) onPatch(task.id, { invoiceAmount: e.target.value === "" ? null : Number(e.target.value) });
+                                    }}
+                                  />
+                                </td>
+                                <td className="py-2">
+                                  <div className="flex items-center gap-1">
+                                    {task.invoiceFileUrl && (
+                                      <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" title={task.invoiceFileName ?? "Invoice PDF"} onClick={e => e.stopPropagation()}>
+                                        <FileText className="h-4 w-4 text-primary" />
+                                      </a>
+                                    )}
+                                    <button type="button" title="Edit full line" onClick={e => { e.stopPropagation(); onEdit(task); }} className="rounded p-1 hover:bg-muted">
+                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function Preparations() {
@@ -213,7 +337,7 @@ export default function Preparations() {
       </Tabs>
     </div>}
 
-    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.projects || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.categories || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.trades || []} /></CardContent></Card></div></details></CardContent></Card>}
+    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><BudgetTable lines={rollups.data.projects || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} /></CardContent></Card></div></details></CardContent></Card>}
   </div>
 
   <Dialog open={!!dialog && ["project", "trade", "task", "plan"].includes(dialog)} onOpenChange={open => !open && closeDialog()}><DialogContent><DialogHeader><DialogTitle>{dialog === "project" ? "New preparation project" : dialog === "trade" ? "Add trade" : dialog === "plan" ? "Attach executive plan" : editingTask ? "Edit procurement line" : "Add procurement line"}</DialogTitle></DialogHeader>
