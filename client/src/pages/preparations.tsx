@@ -252,6 +252,18 @@ export default function Preparations() {
   const selectedBuilding = buildings.data?.find(building => building.id === buildingId);
   const selectedProject = projects.data?.find(project => project.id === projectId);
 
+  // Sync: ensure every location has a preparation project (catches locations added via Admin)
+  useEffect(() => {
+    if (!user) return;
+    api("/api/preparations/sync-location-projects", { method: "POST" })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/preparations/rollups"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/preparations/buildings"] });
+      })
+      .catch(() => { /* non-fatal */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   useEffect(() => { if (!buildingId && buildings.data?.[0]) setBuildingId(buildings.data[0].id); }, [buildings.data, buildingId]);
   useEffect(() => {
     if (projects.data?.length && !projects.data.some(project => project.id === projectId)) setProjectId(projects.data[0].id);

@@ -909,9 +909,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/locations", async (req, res) => {
     try {
-      if (!await requireAdminAccess(req, res)) return;
+      const actor = await requireAdminAccess(req, res);
+      if (!actor) return;
       const data = insertLocationSchema.parse(req.body);
       const location = await storage.createLocation(data);
+      // Auto-create a matching preparation project so the location appears in the rollup
+      try {
+        const existing = await storage.listProjects(location.id);
+        if (existing.length === 0) {
+          await storage.createProject({ buildingId: location.id, name: `Maintenance register · ${location.name}`, status: "Planning", createdBy: actor.id });
+        }
+      } catch (_) { /* non-fatal */ }
       res.status(201).json(location);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -948,7 +956,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             category: `Building ${item.building}`,
           };
 
-          await storage.createLocation(locationToCreate);
+          const loc = await storage.createLocation(locationToCreate);
+          // Auto-create the matching preparation project
+          try {
+            const existing = await storage.listProjects(loc.id);
+            if (existing.length === 0) {
+              await storage.createProject({ buildingId: loc.id, name: `Maintenance register · ${loc.name}`, status: "Planning", createdBy: null });
+            }
+          } catch (_) { /* non-fatal */ }
           results.success++;
         } catch (error: any) {
           results.failed++;
@@ -1433,6 +1448,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete project." });
+    }
+  });
+
+  // Ensure every location has a matching preparation project (idempotent backfill)
+  app.post("/api/preparations/sync-location-projects", async (req, res) => {
+    try {
+      const actor = await requirePreparationAccess(req, res);
+      if (!actor) return;
+      const [allLocations, allProjects] = await Promise.all([storage.listLocations(), storage.listProjects()]);
+      const coveredBuildingIds = new Set(allProjects.map((p: any) => p.buildingId));
+      const missing = allLocations.filter((l: any) => !coveredBuildingIds.has(l.id));
+      await Promise.all(missing.map((l: any) =>
+        storage.createProject({ buildingId: l.id, name: `Maintenance register · ${l.name}`, status: "Planning", createdBy: actor.id })
+      ));
+      res.json({ created: missing.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to sync location projects." });
     }
   });
 
