@@ -1960,6 +1960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const categoryTasks = new Map<string, TaskSummary[]>();
       const tradeTasks = new Map<string, TaskSummary[]>();
+      const projectTasksMap = new Map<string, TaskSummary[]>();
 
       for (let index = 0; index < projectTasks.length; index += 1) {
         const task = projectTasks[index];
@@ -2001,13 +2002,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryTasks.get(catKey)!.push(summary);
         if (!tradeTasks.has(tradeKey)) tradeTasks.set(tradeKey, []);
         tradeTasks.get(tradeKey)!.push(summary);
+        if (!projectTasksMap.has(task.projectId)) projectTasksMap.set(task.projectId, []);
+        projectTasksMap.get(task.projectId)!.push(summary);
       }
       const toLines = (totals: Map<string, Rollup>, tasksMap?: Map<string, TaskSummary[]>) =>
         Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual, tasks: tasksMap?.get(name) ?? [] }));
       res.json({
         grandTotal: { ...grandTotal, variance: grandTotal.estimated - grandTotal.actual },
         buildings: toLines(buildingTotals).map(line => ({ ...line, buildingId: line.name })),
-        projects: toLines(projectTotals).map(line => ({ ...line, projectId: line.name, name: projectNames.get(line.name) || "Untitled project" })),
+        projects: toLines(projectTotals, projectTasksMap).map(line => ({ ...line, projectId: line.name, name: projectNames.get(line.name) || "Untitled project" })),
         categories: toLines(categoryTotals, categoryTasks),
         trades: toLines(tradeTotals, tradeTasks),
       });
