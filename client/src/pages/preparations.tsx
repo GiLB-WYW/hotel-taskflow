@@ -69,6 +69,8 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
   if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
   const toggle = (name: string) => setExpanded(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
   const selectCls = "h-7 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
+  // Strip leading "Prefix · " from project names so the dropdown stays compact
+  const shortLabel = (name: string) => name.includes(' · ') ? name.split(' · ').slice(1).join(' · ') : name;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-sm">
@@ -137,13 +139,13 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                             }}
                                           >
                                             {!projects.some(p => p.id === task.projectId) && (
-                                              <option value={task.projectId}>{task.projectName}</option>
+                                              <option value={task.projectId}>{shortLabel(task.projectName)}</option>
                                             )}
-                                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            {projects.map(p => <option key={p.id} value={p.id}>{shortLabel(p.name)}</option>)}
                                           </select>
                                           {hasPending && (
                                             <div className="flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[10px] ring-1 ring-amber-200">
-                                              <span className="text-amber-800">→ <strong>{pendingProject!.projectName}</strong></span>
+                                              <span className="text-amber-800">→ <strong>{shortLabel(pendingProject!.projectName)}</strong></span>
                                               <button type="button" className="ml-auto rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted" onClick={() => setPendingProject(null)}>Cancel</button>
                                               <button type="button" className="rounded bg-primary px-1.5 py-0.5 text-primary-foreground hover:bg-primary/90" onClick={() => { onPatch(task.id, { projectId: pendingProject!.projectId }); setPendingProject(null); }}>Save</button>
                                             </div>
@@ -241,7 +243,7 @@ export default function Preparations() {
   const buildings = useQuery({ queryKey: ["/api/preparations/buildings"], queryFn: () => api<Location[]>("/api/preparations/buildings"), enabled: !!user });
   const projects = useQuery({ queryKey: ["/api/preparations/projects", buildingId], queryFn: () => api<Project[]>(`/api/preparations/projects?buildingId=${encodeURIComponent(buildingId)}`), enabled: !!buildingId });
   const trades = useQuery({ queryKey: ["/api/preparations/trades"], queryFn: () => api<Trade[]>("/api/preparations/trades"), enabled: !!user });
-  const rollups = useQuery({ queryKey: ["/api/preparations/rollups"], queryFn: () => api<any>("/api/preparations/rollups"), enabled: !!user });
+  const rollups = useQuery({ queryKey: ["/api/preparations/rollups"], queryFn: () => api<any>("/api/preparations/rollups"), enabled: !!user, staleTime: 0 });
   const register = useQuery({ queryKey: ["/api/preparations/register", projectId], queryFn: () => api<Register>(`/api/preparations/projects/${projectId}/register`), enabled: !!projectId });
   const plans = useQuery({ queryKey: ["/api/preparations/plans", projectId], queryFn: () => api<ProjectPlan[]>(`/api/preparations/projects/${projectId}/plans`), enabled: !!projectId });
   const importableTasks = useQuery({ queryKey: ["/api/preparations/importable-tasks", projectId], queryFn: () => api<ImportableTask[]>(`/api/preparations/projects/${projectId}/importable-tasks`), enabled: !!projectId && dialog === "import" });
