@@ -209,8 +209,10 @@ function scopeMatchesLocation(scopeBuilding: string, location: { name: string; c
   const building = normalizedText(scopeBuilding);
   const locationText = normalizedText(`${location.name} ${location.category} ${location.code || ""}`);
   if (building === "paysage") return /(jardin|exterieur|terrasse|parking)/.test(locationText);
-  if (building === "retarddepaiement") return true;
-  if (building === "laguinguette") return /(guinguette|bar|piscine|restaurant)/.test(locationText);
+  // "Retard de paiement" items are cross-property payment delay invoices — never auto-match a location
+  if (building === "retarddepaiement") return false;
+  // La Guinguette is a bar/restaurant space — does NOT match pool (piscine) locations
+  if (building === "laguinguette") return /(guinguette|bar|restaurant)/.test(locationText);
   return locationText.includes(building);
 }
 
