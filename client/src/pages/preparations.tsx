@@ -57,14 +57,17 @@ function BudgetTable({ lines }: { lines: BudgetLine[] }) {
   </table></div>;
 }
 
-function ExpandableBudgetTable({ lines, onPatch, onEdit }: {
+function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: {
   lines: BudgetLine[];
   onPatch: (id: string, data: Record<string, unknown>) => void;
   onEdit: (task: RollupTask) => void;
+  projects: { id: string; name: string }[];
+  suppliers: string[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
   const toggle = (name: string) => setExpanded(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
+  const selectCls = "h-7 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-sm">
@@ -90,7 +93,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit }: {
                   {isOpen && tasks.length > 0 && (
                     <div className="border-t bg-muted/10 pb-3 pt-1">
                       <div className="overflow-x-auto pl-7 pr-2">
-                        <table className="w-full min-w-[700px] text-xs">
+                        <table className="w-full min-w-[820px] text-xs">
                           <thead>
                             <tr className="border-b text-muted-foreground">
                               <th className="py-2 text-left font-medium">Task</th>
@@ -103,60 +106,81 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit }: {
                             </tr>
                           </thead>
                           <tbody>
-                            {tasks.map(task => (
-                              <tr key={task.id} className="border-b last:border-0">
-                                <td className="py-2 pr-3">
-                                  <div className="flex max-w-[200px] flex-wrap items-center gap-1">
-                                    <span className="font-medium leading-tight">{task.title}</span>
-                                    {task.sourceTaskId && <Badge variant="outline" className="text-[9px]">App task</Badge>}
-                                  </div>
-                                  {task.plannedFor && <p className="mt-0.5 text-muted-foreground">{task.plannedFor}</p>}
-                                </td>
-                                <td className="py-2 pr-3 text-muted-foreground">{task.projectName}</td>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    className="h-7 w-28 rounded border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                                    defaultValue={task.supplierName ?? ""}
-                                    placeholder="Pending"
-                                    onBlur={e => { if (e.target.value !== (task.supplierName ?? "")) onPatch(task.id, { supplierName: e.target.value || null }); }}
-                                  />
-                                </td>
-                                <td className="py-2 pr-3 text-right">
-                                  {task.lineTotal !== null && task.lineTotal !== undefined ? money(task.lineTotal) : money(task.estimatedCost)}
-                                </td>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    className="h-7 w-28 rounded border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                                    defaultValue={task.invoiceNumber ?? ""}
-                                    placeholder="Invoice ref"
-                                    onBlur={e => { if (e.target.value !== (task.invoiceNumber ?? "")) onPatch(task.id, { invoiceNumber: e.target.value || null }); }}
-                                  />
-                                </td>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    type="number" min="0"
-                                    className="h-7 w-24 rounded border bg-background px-2 text-right text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                                    defaultValue={task.invoiceAmount ?? task.actualCost ?? ""}
-                                    onBlur={e => {
-                                      const cur = String(task.invoiceAmount ?? task.actualCost ?? "");
-                                      if (e.target.value !== cur) onPatch(task.id, { invoiceAmount: e.target.value === "" ? null : Number(e.target.value) });
-                                    }}
-                                  />
-                                </td>
-                                <td className="py-2">
-                                  <div className="flex items-center gap-1">
-                                    {task.invoiceFileUrl && (
-                                      <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" title={task.invoiceFileName ?? "Invoice PDF"} onClick={e => e.stopPropagation()}>
-                                        <FileText className="h-4 w-4 text-primary" />
-                                      </a>
-                                    )}
-                                    <button type="button" title="Edit full line" onClick={e => { e.stopPropagation(); onEdit(task); }} className="rounded p-1 hover:bg-muted">
-                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                            {tasks.map(task => {
+                              const taskSupplier = task.supplierName ?? "";
+                              const hasUnknownSupplier = taskSupplier && !suppliers.includes(taskSupplier);
+                              return (
+                                <tr key={task.id} className="border-b last:border-0">
+                                  <td className="py-2 pr-3">
+                                    <div className="flex max-w-[200px] flex-wrap items-center gap-1">
+                                      <span className="font-medium leading-tight">{task.title}</span>
+                                      {task.sourceTaskId && <Badge variant="outline" className="text-[9px]">App task</Badge>}
+                                    </div>
+                                    {task.plannedFor && <p className="mt-0.5 text-muted-foreground">{task.plannedFor}</p>}
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <select
+                                      className={`${selectCls} w-44`}
+                                      value={task.projectId}
+                                      disabled={!!task.sourceTaskId}
+                                      title={task.sourceTaskId ? "App tasks cannot be moved to another project" : "Reassign to a different project"}
+                                      onChange={e => { if (e.target.value !== task.projectId) onPatch(task.id, { projectId: e.target.value }); }}
+                                    >
+                                      {/* keep current project in list even if somehow not in master list */}
+                                      {!projects.some(p => p.id === task.projectId) && (
+                                        <option value={task.projectId}>{task.projectName}</option>
+                                      )}
+                                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <select
+                                      className={`${selectCls} w-36`}
+                                      value={taskSupplier}
+                                      onChange={e => onPatch(task.id, { supplierName: e.target.value || null })}
+                                    >
+                                      <option value="">Pending</option>
+                                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                                      {hasUnknownSupplier && <option value={taskSupplier}>{taskSupplier}</option>}
+                                    </select>
+                                  </td>
+                                  <td className="py-2 pr-3 text-right">
+                                    {task.lineTotal !== null && task.lineTotal !== undefined ? money(task.lineTotal) : money(task.estimatedCost)}
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      className="h-7 w-28 rounded border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                      defaultValue={task.invoiceNumber ?? ""}
+                                      placeholder="Invoice ref"
+                                      onBlur={e => { if (e.target.value !== (task.invoiceNumber ?? "")) onPatch(task.id, { invoiceNumber: e.target.value || null }); }}
+                                    />
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      type="number" min="0"
+                                      className="h-7 w-24 rounded border bg-background px-2 text-right text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                      defaultValue={task.invoiceAmount ?? task.actualCost ?? ""}
+                                      onBlur={e => {
+                                        const cur = String(task.invoiceAmount ?? task.actualCost ?? "");
+                                        if (e.target.value !== cur) onPatch(task.id, { invoiceAmount: e.target.value === "" ? null : Number(e.target.value) });
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-2">
+                                    <div className="flex items-center gap-1">
+                                      {task.invoiceFileUrl && (
+                                        <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" title={task.invoiceFileName ?? "Invoice PDF"} onClick={e => e.stopPropagation()}>
+                                          <FileText className="h-4 w-4 text-primary" />
+                                        </a>
+                                      )}
+                                      <button type="button" title="Edit full line" onClick={e => { e.stopPropagation(); onEdit(task); }} className="rounded p-1 hover:bg-muted">
+                                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -214,6 +238,18 @@ export default function Preparations() {
   }, [projects.data, projectId]);
 
   const categorySections = useMemo(() => Array.from(new Set((register.data?.tasks || []).map(task => task.category || DEFAULT_CATEGORY))).sort(), [register.data?.tasks]);
+
+  // Derived lists for portfolio-rollup dropdowns
+  const rollupProjects = useMemo(() =>
+    (rollups.data?.projects ?? []).map((p: any) => ({ id: p.projectId ?? p.name, name: p.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+    [rollups.data]);
+  const rollupSuppliers = useMemo(() => {
+    const names = new Set<string>();
+    for (const group of [...(rollups.data?.categories ?? []), ...(rollups.data?.trades ?? []), ...(rollups.data?.projects ?? [])]) {
+      for (const task of (group.tasks ?? [])) { if (task.supplierName) names.add(task.supplierName); }
+    }
+    return Array.from(names).sort();
+  }, [rollups.data]);
   const invalidateRegister = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/preparations/register", projectId] });
     queryClient.invalidateQueries({ queryKey: ["/api/preparations/rollups"] });
@@ -337,7 +373,7 @@ export default function Preparations() {
       </Tabs>
     </div>}
 
-    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} /></CardContent></Card></div></details></CardContent></Card>}
+    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card></div></details></CardContent></Card>}
   </div>
 
   <Dialog open={!!dialog && ["project", "trade", "task", "plan"].includes(dialog)} onOpenChange={open => !open && closeDialog()}><DialogContent><DialogHeader><DialogTitle>{dialog === "project" ? "New preparation project" : dialog === "trade" ? "Add trade" : dialog === "plan" ? "Attach executive plan" : editingTask ? "Edit procurement line" : "Add procurement line"}</DialogTitle></DialogHeader>
