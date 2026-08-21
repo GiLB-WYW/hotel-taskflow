@@ -65,6 +65,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
   suppliers: string[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [pendingProject, setPendingProject] = useState<{ taskId: string; projectId: string; projectName: string } | null>(null);
   if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
   const toggle = (name: string) => setExpanded(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
   const selectCls = "h-7 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
@@ -119,19 +120,37 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                     {task.plannedFor && <p className="mt-0.5 text-muted-foreground">{task.plannedFor}</p>}
                                   </td>
                                   <td className="py-2 pr-2">
-                                    <select
-                                      className={`${selectCls} w-44`}
-                                      value={task.projectId}
-                                      disabled={!!task.sourceTaskId}
-                                      title={task.sourceTaskId ? "App tasks cannot be moved to another project" : "Reassign to a different project"}
-                                      onChange={e => { if (e.target.value !== task.projectId) onPatch(task.id, { projectId: e.target.value }); }}
-                                    >
-                                      {/* keep current project in list even if somehow not in master list */}
-                                      {!projects.some(p => p.id === task.projectId) && (
-                                        <option value={task.projectId}>{task.projectName}</option>
-                                      )}
-                                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
+                                    {(() => {
+                                      const hasPending = pendingProject?.taskId === task.id;
+                                      const displayId = hasPending ? pendingProject!.projectId : task.projectId;
+                                      return (
+                                        <div className="flex flex-col gap-1">
+                                          <select
+                                            className={`${selectCls} w-44`}
+                                            value={displayId}
+                                            disabled={!!task.sourceTaskId}
+                                            title={task.sourceTaskId ? "App tasks cannot be moved to another project" : "Reassign to a different project"}
+                                            onChange={e => {
+                                              if (e.target.value === task.projectId) { setPendingProject(null); return; }
+                                              const chosen = projects.find(p => p.id === e.target.value);
+                                              if (chosen) setPendingProject({ taskId: task.id, projectId: chosen.id, projectName: chosen.name });
+                                            }}
+                                          >
+                                            {!projects.some(p => p.id === task.projectId) && (
+                                              <option value={task.projectId}>{task.projectName}</option>
+                                            )}
+                                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                          </select>
+                                          {hasPending && (
+                                            <div className="flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[10px] ring-1 ring-amber-200">
+                                              <span className="text-amber-800">→ <strong>{pendingProject!.projectName}</strong></span>
+                                              <button type="button" className="ml-auto rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted" onClick={() => setPendingProject(null)}>Cancel</button>
+                                              <button type="button" className="rounded bg-primary px-1.5 py-0.5 text-primary-foreground hover:bg-primary/90" onClick={() => { onPatch(task.id, { projectId: pendingProject!.projectId }); setPendingProject(null); }}>Save</button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </td>
                                   <td className="py-2 pr-2">
                                     <select
