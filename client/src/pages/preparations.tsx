@@ -242,6 +242,8 @@ export default function Preparations() {
 
   const buildings = useQuery({ queryKey: ["/api/preparations/buildings"], queryFn: () => api<Location[]>("/api/preparations/buildings"), enabled: !!user });
   const projects = useQuery({ queryKey: ["/api/preparations/projects", buildingId], queryFn: () => api<Project[]>(`/api/preparations/projects?buildingId=${encodeURIComponent(buildingId)}`), enabled: !!buildingId });
+  // All projects across all buildings — used for the rollup reassignment dropdown
+  const allProjects = useQuery({ queryKey: ["/api/preparations/projects/all"], queryFn: () => api<Project[]>("/api/preparations/projects"), enabled: !!user, staleTime: 0 });
   const trades = useQuery({ queryKey: ["/api/preparations/trades"], queryFn: () => api<Trade[]>("/api/preparations/trades"), enabled: !!user });
   const rollups = useQuery({ queryKey: ["/api/preparations/rollups"], queryFn: () => api<any>("/api/preparations/rollups"), enabled: !!user, staleTime: 0 });
   const register = useQuery({ queryKey: ["/api/preparations/register", projectId], queryFn: () => api<Register>(`/api/preparations/projects/${projectId}/register`), enabled: !!projectId });
@@ -274,8 +276,8 @@ export default function Preparations() {
 
   // Derived lists for portfolio-rollup dropdowns
   const rollupProjects = useMemo(() =>
-    (rollups.data?.projects ?? []).map((p: any) => ({ id: p.projectId ?? p.name, name: p.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)),
-    [rollups.data]);
+    (allProjects.data ?? []).map((p: any) => ({ id: p.id, name: p.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+    [allProjects.data]);
   const rollupSuppliers = useMemo(() => {
     const names = new Set<string>();
     for (const group of [...(rollups.data?.categories ?? []), ...(rollups.data?.trades ?? []), ...(rollups.data?.projects ?? [])]) {
