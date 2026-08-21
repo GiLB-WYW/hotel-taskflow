@@ -19,7 +19,10 @@ interface Location {
   category: string;
 }
 
-const CATEGORIES = ["Restaurant", "Suites B", "Suites C", "Technique"];
+interface Category {
+  id: string;
+  name: string;
+}
 
 export default function AdminLocations() {
   const [, setLocation] = useLocation();
@@ -35,6 +38,10 @@ export default function AdminLocations() {
 
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
   });
 
   const createMutation = useMutation({
@@ -340,9 +347,9 @@ export default function AdminLocations() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -392,9 +399,9 @@ export default function AdminLocations() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
