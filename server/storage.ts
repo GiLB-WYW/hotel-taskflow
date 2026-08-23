@@ -8,6 +8,9 @@ import {
   type InsertLocation,
   type MaintenanceGroup,
   type InsertMaintenanceGroup,
+  type Supplier,
+  type InsertSupplier,
+  type MaintenanceGroupSupplier,
   type Task,
   type InsertTask,
   type Note,
@@ -34,6 +37,8 @@ import {
   categoriesTable,
   locationsTable,
   maintenanceGroupsTable,
+  suppliersTable,
+  maintenanceGroupSuppliersTable,
   tasksTable,
   notesTable,
   invitationsTable,
@@ -49,6 +54,7 @@ import {
   insertCategorySchema,
   insertLocationSchema,
   insertMaintenanceGroupSchema,
+  insertSupplierSchema,
   insertTaskSchema,
   insertNoteSchema,
   insertInvitationSchema,
@@ -101,6 +107,15 @@ export interface IStorage {
   updateMaintenanceGroup(id: string, updates: Partial<InsertMaintenanceGroup>): Promise<MaintenanceGroup>;
   deleteMaintenanceGroup(id: string): Promise<void>;
   listMaintenanceGroups(): Promise<MaintenanceGroup[]>;
+
+  // Supplier catalogue
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, updates: Partial<InsertSupplier>): Promise<Supplier>;
+  listSuppliers(): Promise<Supplier[]>;
+  listMaintenanceGroupSupplierLinks(): Promise<MaintenanceGroupSupplier[]>;
+  setMaintenanceGroupSuppliers(groupId: string, supplierIds: string[]): Promise<void>;
+  setSupplierMaintenanceGroups(supplierId: string, groupIds: string[]): Promise<void>;
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
@@ -360,6 +375,57 @@ export class PostgresStorage implements IStorage {
 
   async listMaintenanceGroups(): Promise<MaintenanceGroup[]> {
     return await db.select().from(maintenanceGroupsTable);
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const supplier = await db.select().from(suppliersTable).where(eq(suppliersTable.id, id));
+    return supplier[0];
+  }
+
+  async createSupplier(data: InsertSupplier): Promise<Supplier> {
+    const validated = insertSupplierSchema.parse(data);
+    const supplier = await db.insert(suppliersTable).values(validated).returning();
+    return supplier[0];
+  }
+
+  async updateSupplier(id: string, updates: Partial<InsertSupplier>): Promise<Supplier> {
+    const validated = insertSupplierSchema.partial().parse(updates);
+    const supplier = await db.update(suppliersTable).set(validated).where(eq(suppliersTable.id, id)).returning();
+    return supplier[0];
+  }
+
+  async listSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliersTable).orderBy(suppliersTable.name);
+  }
+
+  async listMaintenanceGroupSupplierLinks(): Promise<MaintenanceGroupSupplier[]> {
+    return await db.select().from(maintenanceGroupSuppliersTable);
+  }
+
+  async setMaintenanceGroupSuppliers(groupId: string, supplierIds: string[]): Promise<void> {
+    const uniqueSupplierIds = Array.from(new Set(supplierIds));
+    await db.transaction(async (tx) => {
+      await tx.delete(maintenanceGroupSuppliersTable)
+        .where(eq(maintenanceGroupSuppliersTable.maintenanceGroupId, groupId));
+      if (uniqueSupplierIds.length) {
+        await tx.insert(maintenanceGroupSuppliersTable).values(
+          uniqueSupplierIds.map(supplierId => ({ maintenanceGroupId: groupId, supplierId })),
+        );
+      }
+    });
+  }
+
+  async setSupplierMaintenanceGroups(supplierId: string, groupIds: string[]): Promise<void> {
+    const uniqueGroupIds = Array.from(new Set(groupIds));
+    await db.transaction(async (tx) => {
+      await tx.delete(maintenanceGroupSuppliersTable)
+        .where(eq(maintenanceGroupSuppliersTable.supplierId, supplierId));
+      if (uniqueGroupIds.length) {
+        await tx.insert(maintenanceGroupSuppliersTable).values(
+          uniqueGroupIds.map(maintenanceGroupId => ({ maintenanceGroupId, supplierId })),
+        );
+      }
+    });
   }
 
   async getTask(id: string): Promise<Task | undefined> {

@@ -6,6 +6,7 @@ import {
   insertTaskSchema,
   insertLocationSchema,
   insertMaintenanceGroupSchema,
+  insertSupplierSchema,
   insertCategorySchema,
   insertActivityLogSchema,
   insertProjectSchema,
@@ -1322,13 +1323,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Maintenance Groups routes
   app.get("/api/maintenance-groups", async (req, res) => {
     try {
-      const groups = await storage.listMaintenanceGroups();
-      const users = await storage.listUsers();
+      const [groups, users, links] = await Promise.all([
+        storage.listMaintenanceGroups(),
+        storage.listUsers(),
+        storage.listMaintenanceGroupSupplierLinks(),
+      ]);
       
       // Calculate member count dynamically from users' groups array
       const groupsWithCounts = groups.map(group => {
         const memberCount = users.filter(u => u.groups?.includes(group.id)).length;
-        return { ...group, memberCount };
+        const supplierIds = links
+          .filter(link => link.maintenanceGroupId === group.id)
+          .map(link => link.supplierId);
+        return { ...group, memberCount, supplierIds };
       });
       
       res.json(groupsWithCounts);
@@ -1388,7 +1395,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Supplier catalogue — Admin controls names and group assignment; Preparations reads it below.
+  app.get("/api/suppliers", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      const [suppliers, links] = await Promise.all([
+        storage.listSuppliers(),
+        storage.listMaintenanceGroupSupplierLinks(),
+      ]);
+      res.json(suppliers.map(supplier => ({
+        ...supplier,
+        groupIds: links
+          .filter(link => link.supplierId === supplier.id)
+          .map(link => link.maintenanceGroupId),
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch suppliers." });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      const data = insertSupplierSchema.parse(req.body);
+      const name = data.name.trim();
+      if (!name) return res.status(400).json({ error: "Supplier name is required." });
+      const exists = (await storage.listSuppliers()).some(supplier => supplier.name.trim().toLowerCase() === name.toLowerCase());
+      if (exists) return res.status(409).json({ error: "A supplier with this name already exists." });
+      res.status(201).json(await storage.createSupplier({ ...data, name }));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create supplier." });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      const existing = await storage.getSupplier(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Supplier not found." });
+      const data = insertSupplierSchema.partial().parse(req.body);
+      const name = data.name?.trim();
+      if (data.name !== undefined && !name) return res.status(400).json({ error: "Supplier name is required." });
+      if (name) {
+        const exists = (await storage.listSuppliers()).some(supplier =>
+          supplier.id !== existing.id && supplier.name.trim().toLowerCase() === name.toLowerCase(),
+        );
+        if (exists) return res.status(409).json({ error: "A supplier with this name already exists." });
+      }
+      res.json(await storage.updateSupplier(existing.id, { ...data, ...(name ? { name } : {}) }));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update supplier." });
+    }
+  });
+
+  app.put("/api/suppliers/:id/groups", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      if (!await storage.getSupplier(req.params.id)) {
+        return res.status(404).json({ error: "Supplier not found." });
+      }
+      const { groupIds } = z.object({ groupIds: z.array(z.string()).max(200) }).parse(req.body);
+      const uniqueGroupIds = Array.from(new Set(groupIds));
+      const groups = await storage.listMaintenanceGroups();
+      if (uniqueGroupIds.some(id => !groups.some(group => group.id === id))) {
+        return res.status(400).json({ error: "One or more maintenance groups no longer exist." });
+      }
+      await storage.setSupplierMaintenanceGroups(req.params.id, uniqueGroupIds);
+      res.json({ groupIds: uniqueGroupIds });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update supplier groups." });
+    }
+  });
+
+  app.put("/api/maintenance-groups/:id/suppliers", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      if (!await storage.getMaintenanceGroup(req.params.id)) {
+        return res.status(404).json({ error: "Maintenance group not found." });
+      }
+      const { supplierIds } = z.object({ supplierIds: z.array(z.string()).max(200) }).parse(req.body);
+      const uniqueSupplierIds = Array.from(new Set(supplierIds));
+      const suppliers = await storage.listSuppliers();
+      if (uniqueSupplierIds.some(id => !suppliers.some(supplier => supplier.id === id))) {
+        return res.status(400).json({ error: "One or more suppliers no longer exist." });
+      }
+      await storage.setMaintenanceGroupSuppliers(req.params.id, uniqueSupplierIds);
+      res.json({ supplierIds: uniqueSupplierIds });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update group suppliers." });
+    }
+  });
+
   // Project Preparation — each endpoint verifies a real Admin or Coordinator.
+  app.get("/api/preparations/suppliers", async (req, res) => {
+    try {
+      if (!await requirePreparationAccess(req, res)) return;
+      const [suppliers, groups, links] = await Promise.all([
+        storage.listSuppliers(),
+        storage.listMaintenanceGroups(),
+        storage.listMaintenanceGroupSupplierLinks(),
+      ]);
+      const groupNames = new Map(groups.map(group => [group.id, group.name]));
+      res.json(suppliers
+        .filter(supplier => supplier.isActive)
+        .map(supplier => ({
+          id: supplier.id,
+          name: supplier.name,
+          groupNames: links
+            .filter(link => link.supplierId === supplier.id)
+            .map(link => groupNames.get(link.maintenanceGroupId))
+            .filter((name): name is string => Boolean(name))
+            .sort((a, b) => a.localeCompare(b)),
+        })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch preparation suppliers." });
+    }
+  });
+
   app.get("/api/preparations/buildings", async (req, res) => {
     try {
       if (!await requirePreparationAccess(req, res)) return;

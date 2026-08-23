@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, numeric, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -42,6 +42,24 @@ export const maintenanceGroupsTable = pgTable("maintenance_groups", {
   memberCount: integer("member_count").default(0),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
+
+// Supplier catalogue managed by administrators. A supplier can serve more than one group.
+export const suppliersTable = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const maintenanceGroupSuppliersTable = pgTable("maintenance_group_suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  maintenanceGroupId: varchar("maintenance_group_id").notNull().references(() => maintenanceGroupsTable.id, { onDelete: "cascade" }),
+  supplierId: varchar("supplier_id").notNull().references(() => suppliersTable.id, { onDelete: "cascade" }),
+}, (table) => ({
+  maintenanceGroupSupplierUnique: uniqueIndex("maintenance_group_suppliers_group_supplier_unique")
+    .on(table.maintenanceGroupId, table.supplierId),
+}));
 
 // Tasks table
 export const tasksTable = pgTable("tasks", {
@@ -207,6 +225,11 @@ export const insertMaintenanceGroupSchema = createInsertSchema(maintenanceGroups
   createdAt: true,
 });
 
+export const insertSupplierSchema = createInsertSchema(suppliersTable).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTaskSchema = createInsertSchema(tasksTable).omit({
   id: true,
   createdAt: true,
@@ -274,6 +297,8 @@ export type User = typeof usersTable.$inferSelect;
 export type Category = typeof categoriesTable.$inferSelect;
 export type Location = typeof locationsTable.$inferSelect;
 export type MaintenanceGroup = typeof maintenanceGroupsTable.$inferSelect;
+export type Supplier = typeof suppliersTable.$inferSelect;
+export type MaintenanceGroupSupplier = typeof maintenanceGroupSuppliersTable.$inferSelect;
 export type Task = typeof tasksTable.$inferSelect;
 export type Note = typeof notesTable.$inferSelect;
 export type Invitation = typeof invitationsTable.$inferSelect;
@@ -291,6 +316,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
 export type InsertMaintenanceGroup = z.infer<typeof insertMaintenanceGroupSchema>;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type InsertInvitation = z.infer<typeof insertInvitationSchema>;

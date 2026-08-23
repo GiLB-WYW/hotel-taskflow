@@ -40,6 +40,7 @@ type Register = { tasks: RegisterTask[]; totals: Omit<BudgetLine, "name" | "task
 type Quote = { id: string; supplierName: string; amount: number; fileName?: string; fileUrl?: string };
 type ImportableTask = { id: string; title: string; description?: string; status: string; priority: string; assignedGroupName?: string; category: string; tradeName: string };
 type ScopeItem = { id: string; building: string; title: string; plannedFor?: string; supplierName?: string; category: string; tradeName: string; estimatedCost?: string; quantity?: string; invoiceNumber?: string; invoiceAmount?: string; imported: boolean };
+type PreparationSupplier = { id: string; name: string; groupNames: string[] };
 
 const money = (value = 0) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0);
 const DEFAULT_CATEGORY = "General Works";
@@ -59,12 +60,47 @@ function BudgetTable({ lines }: { lines: BudgetLine[] }) {
   </table></div>;
 }
 
+function SupplierSelect({ value, onChange, suppliers, className = "", legacyName, pendingLabel = "Pending" }: {
+  value: string;
+  onChange: (value: string) => void;
+  suppliers: PreparationSupplier[];
+  className?: string;
+  legacyName?: string | null;
+  pendingLabel?: string;
+}) {
+  const supplierNames = new Set(suppliers.map(supplier => supplier.name));
+  const groups = Array.from(new Set(suppliers.flatMap(supplier => supplier.groupNames))).sort((a, b) => a.localeCompare(b));
+  const unassigned = suppliers.filter(supplier => !supplier.groupNames.length);
+  return (
+    <select className={className} value={value} onChange={event => onChange(event.target.value)}>
+      <option value="">{pendingLabel}</option>
+      {groups.map(group => (
+        <optgroup key={group} label={group}>
+          {suppliers
+            .filter(supplier => supplier.groupNames.includes(group))
+            .map(supplier => <option key={`${group}-${supplier.id}`} value={supplier.name}>{supplier.name}</option>)}
+        </optgroup>
+      ))}
+      {unassigned.length > 0 && (
+        <optgroup label="Other suppliers">
+          {unassigned.map(supplier => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}
+        </optgroup>
+      )}
+      {legacyName && !supplierNames.has(legacyName) && (
+        <optgroup label="Saved supplier">
+          <option value={legacyName}>{legacyName}</option>
+        </optgroup>
+      )}
+    </select>
+  );
+}
+
 function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: {
   lines: BudgetLine[];
   onPatch: (id: string, data: Record<string, unknown>) => void;
   onEdit: (task: RollupTask) => void;
   projects: { id: string; name: string }[];
-  suppliers: string[];
+  suppliers: PreparationSupplier[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingProject, setPendingProject] = useState<{ taskId: string; projectId: string; projectName: string } | null>(null);
@@ -114,7 +150,6 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                           <tbody>
                             {tasks.map(task => {
                               const taskSupplier = task.supplierName ?? "";
-                              const hasUnknownSupplier = taskSupplier && !suppliers.includes(taskSupplier);
                               return (
                                 <tr key={task.id} className={`border-b last:border-0 ${task.isActive ? "" : "bg-muted/30 text-muted-foreground"}`}>
                                   <td className="py-2 pr-3">
@@ -163,15 +198,13 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                     })()}
                                   </td>
                                   <td className="py-2 pr-2">
-                                    <select
+                                    <SupplierSelect
                                       className={`${selectCls} w-36`}
                                       value={taskSupplier}
-                                      onChange={e => onPatch(task.id, { supplierName: e.target.value || null })}
-                                    >
-                                      <option value="">Pending</option>
-                                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                                      {hasUnknownSupplier && <option value={taskSupplier}>{taskSupplier}</option>}
-                                    </select>
+                                      legacyName={taskSupplier}
+                                      suppliers={suppliers}
+                                      onChange={supplierName => onPatch(task.id, { supplierName: supplierName || null })}
+                                    />
                                   </td>
                                    <td className="py-2 pr-2 text-center">
                                      <Switch
@@ -260,6 +293,13 @@ export default function Preparations() {
   // All projects across all buildings — used for the rollup reassignment dropdown
   const allProjects = useQuery({ queryKey: ["/api/preparations/projects/all"], queryFn: () => api<Project[]>("/api/preparations/projects"), enabled: !!user, staleTime: 0 });
   const trades = useQuery({ queryKey: ["/api/preparations/trades"], queryFn: () => api<Trade[]>("/api/preparations/trades"), enabled: !!user });
+  const supplierCatalog = useQuery({
+    queryKey: ["/api/preparations/suppliers"],
+    queryFn: () => api<PreparationSupplier[]>("/api/preparations/suppliers"),
+    enabled: !!user,
+    staleTime: 0,
+    refetchInterval: 15000,
+  });
   const rollups = useQuery({ queryKey: ["/api/preparations/rollups"], queryFn: () => api<any>("/api/preparations/rollups"), enabled: !!user, staleTime: 0 });
   const register = useQuery({ queryKey: ["/api/preparations/register", projectId], queryFn: () => api<Register>(`/api/preparations/projects/${projectId}/register`), enabled: !!projectId });
   const plans = useQuery({ queryKey: ["/api/preparations/plans", projectId], queryFn: () => api<ProjectPlan[]>(`/api/preparations/projects/${projectId}/plans`), enabled: !!projectId });
@@ -293,13 +333,6 @@ export default function Preparations() {
   const rollupProjects = useMemo(() =>
     (allProjects.data ?? []).map((p: any) => ({ id: p.id, name: p.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)),
     [allProjects.data]);
-  const rollupSuppliers = useMemo(() => {
-    const names = new Set<string>();
-    for (const group of [...(rollups.data?.categories ?? []), ...(rollups.data?.trades ?? []), ...(rollups.data?.projects ?? [])]) {
-      for (const task of (group.tasks ?? [])) { if (task.supplierName) names.add(task.supplierName); }
-    }
-    return Array.from(names).sort();
-  }, [rollups.data]);
   const invalidateRegister = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/preparations/register", projectId] });
     queryClient.invalidateQueries({ queryKey: ["/api/preparations/rollups"] });
@@ -459,7 +492,15 @@ export default function Preparations() {
                         </td>
                         <td className="px-3 py-3 text-xs"><p>{task.category}</p><p className="mt-1 text-muted-foreground">{trades.data?.find(trade => trade.id === task.tradeId)?.name || "Unassigned"}</p></td>
                         <td className="px-3 py-3"><Input className="h-8 min-w-[170px]" defaultValue={task.productDescription || ""} placeholder="Not specified" onBlur={event => commitInline(task, "productDescription", event.target.value)} /></td>
-                        <td className="px-3 py-3"><Input className="h-8 min-w-[150px]" defaultValue={task.supplierName || ""} placeholder="Pending" onBlur={event => commitInline(task, "supplierName", event.target.value)} /></td>
+                        <td className="px-3 py-3">
+                          <SupplierSelect
+                            className="h-8 min-w-[170px] rounded-md border border-input bg-background px-2 text-sm"
+                            value={task.supplierName || ""}
+                            legacyName={task.supplierName}
+                            suppliers={supplierCatalog.data || []}
+                            onChange={supplierName => patchTask.mutate({ id: task.id, data: { supplierName: supplierName || null } })}
+                          />
+                        </td>
                         <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.unitPrice ?? ""} onBlur={event => commitInline(task, "unitPrice", event.target.value, true)} /></td>
                         <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-16 text-right" defaultValue={task.quantity ?? ""} onBlur={event => commitInline(task, "quantity", event.target.value, true)} /></td>
                         <td className="px-3 py-3 text-right font-semibold">{task.unitPrice !== null && task.quantity !== null ? money(task.lineTotal) : "Pending"}</td>
@@ -481,14 +522,65 @@ export default function Preparations() {
       </Tabs>
     </div>}
 
-    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={rollupSuppliers} /></CardContent></Card></div></details></CardContent></Card>}
+    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card></div></details></CardContent></Card>}
   </div>
 
   <Dialog open={!!dialog && ["project", "trade", "task", "plan"].includes(dialog)} onOpenChange={open => !open && closeDialog()}><DialogContent><DialogHeader><DialogTitle>{dialog === "project" ? "New preparation project" : dialog === "trade" ? "Add trade" : dialog === "plan" ? "Attach executive plan" : editingTask ? "Edit procurement line" : "Add procurement line"}</DialogTitle></DialogHeader>
     {dialog === "project" && <div className="space-y-3"><Input placeholder="Project name" value={form.name || ""} onChange={event => setForm({ ...form, name: event.target.value })} /><Textarea placeholder="Scope and notes" value={form.description || ""} onChange={event => setForm({ ...form, description: event.target.value })} /><Select value={form.status || "Planning"} onValueChange={status => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Planning">Planning</SelectItem><SelectItem value="Ready">Ready for execution</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent></Select></div>}
     {dialog === "trade" && <Input placeholder="Trade name" value={form.name || ""} onChange={event => setForm({ ...form, name: event.target.value })} />}
     {dialog === "plan" && <div className="space-y-3"><div className="rounded-lg border border-dashed p-5 text-center"><UploadCloud className="mx-auto h-7 w-7 text-primary/60" /><p className="mt-2 text-sm font-medium">Upload a PDF</p><input id="plan-file" type="file" accept="application/pdf" className="mx-auto mt-2 block max-w-full text-xs" /></div><Input placeholder="File name" value={form.fileName || ""} onChange={event => setForm({ ...form, fileName: event.target.value })} /><Input placeholder="https://..." value={form.fileUrl || ""} onChange={event => setForm({ ...form, fileUrl: event.target.value })} /></div>}
-    {dialog === "task" && <div className="space-y-3">{editingTask?.sourceTaskId && editingTask.sourceHasImage !== false && <a href={`/api/tasks/${editingTask.sourceTaskId}/thumbnail`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted/30"><div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium"><ImageIcon className="h-4 w-4 text-primary" />Original maintenance photo <span className="ml-auto text-xs font-normal text-muted-foreground">Open full size</span></div><img src={`/api/tasks/${editingTask.sourceTaskId}/thumbnail`} onError={event => event.currentTarget.parentElement?.remove()} alt={`Photo for ${editingTask.title}`} className="max-h-64 w-full object-contain" /></a>}<Input placeholder="Task" value={form.title || ""} onChange={event => setForm({ ...form, title: event.target.value })} /><Textarea placeholder="Product description / scope" value={form.productDescription || ""} onChange={event => setForm({ ...form, productDescription: event.target.value })} /><div className="grid gap-3 sm:grid-cols-2"><Input placeholder="Supplier (leave blank if pending)" value={form.supplierName || ""} onChange={event => setForm({ ...form, supplierName: event.target.value })} /><Input placeholder="Planned month / date" value={form.plannedFor || ""} onChange={event => setForm({ ...form, plannedFor: event.target.value })} /><Input placeholder="Category" value={form.category || DEFAULT_CATEGORY} onChange={event => setForm({ ...form, category: event.target.value })} /><Select value={form.tradeId || "none"} onValueChange={tradeId => setForm({ ...form, tradeId: tradeId === "none" ? "" : tradeId })}><SelectTrigger><SelectValue placeholder="Assign trade" /></SelectTrigger><SelectContent><SelectItem value="none">Unassigned</SelectItem>{trades.data?.map(trade => <SelectItem key={trade.id} value={trade.id}>{trade.name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-3"><Input type="number" min="0" placeholder="Unit price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} /><Input type="number" min="0" placeholder="Quantity" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} /><Select value={form.status || "Planned"} onValueChange={status => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent></Select></div><div className="space-y-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-sm font-medium">Final invoice</p><p className="text-xs text-muted-foreground">Invoice reference and actual amount are tracked separately from the planned line total.</p></div><div className="grid gap-3 sm:grid-cols-2"><Input placeholder="Invoice reference" value={form.invoiceNumber || ""} onChange={event => setForm({ ...form, invoiceNumber: event.target.value })} /><Input type="number" min="0" placeholder="Invoice / actual amount" value={form.invoiceAmount || ""} onChange={event => setForm({ ...form, invoiceAmount: event.target.value })} /></div><div className="rounded-md border border-dashed bg-background p-3"><div className="flex items-center gap-2"><UploadCloud className="h-4 w-4 text-primary" /><label htmlFor="invoice-file" className="text-sm font-medium">Invoice PDF</label></div><input id="invoice-file" type="file" accept="application/pdf,.pdf" className="mt-2 block max-w-full text-xs" onChange={event => setInvoiceFile(event.target.files?.[0] || null)} /><p className="mt-1 text-xs text-muted-foreground">{invoiceFile ? `${invoiceFile.name} will replace the current invoice when you save.` : form.invoiceFileUrl ? "Choose another PDF to replace the attached invoice." : "PDF only, up to 25 MB."}</p>{form.invoiceFileUrl && <a href={form.invoiceFileUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText className="h-3.5 w-3.5" />{form.invoiceFileName || "View current invoice PDF"}</a>}</div></div></div>}
+    {dialog === "task" && (
+      <div className="space-y-3">
+        {editingTask?.sourceTaskId && editingTask.sourceHasImage !== false && (
+          <a href={`/api/tasks/${editingTask.sourceTaskId}/thumbnail`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted/30">
+            <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium"><ImageIcon className="h-4 w-4 text-primary" />Original maintenance photo <span className="ml-auto text-xs font-normal text-muted-foreground">Open full size</span></div>
+            <img src={`/api/tasks/${editingTask.sourceTaskId}/thumbnail`} onError={event => event.currentTarget.parentElement?.remove()} alt={`Photo for ${editingTask.title}`} className="max-h-64 w-full object-contain" />
+          </a>
+        )}
+        <Input placeholder="Task" value={form.title || ""} onChange={event => setForm({ ...form, title: event.target.value })} />
+        <Textarea placeholder="Product description / scope" value={form.productDescription || ""} onChange={event => setForm({ ...form, productDescription: event.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Supplier</label>
+            <SupplierSelect
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.supplierName || ""}
+              legacyName={form.supplierName}
+              suppliers={supplierCatalog.data || []}
+              pendingLabel="Select a supplier"
+              onChange={supplierName => setForm({ ...form, supplierName })}
+            />
+          </div>
+          <Input placeholder="Planned month / date" value={form.plannedFor || ""} onChange={event => setForm({ ...form, plannedFor: event.target.value })} />
+          <Input placeholder="Category" value={form.category || DEFAULT_CATEGORY} onChange={event => setForm({ ...form, category: event.target.value })} />
+          <Select value={form.tradeId || "none"} onValueChange={tradeId => setForm({ ...form, tradeId: tradeId === "none" ? "" : tradeId })}>
+            <SelectTrigger><SelectValue placeholder="Assign trade" /></SelectTrigger>
+            <SelectContent><SelectItem value="none">Unassigned</SelectItem>{trades.data?.map(trade => <SelectItem key={trade.id} value={trade.id}>{trade.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Input type="number" min="0" placeholder="Unit price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} />
+          <Input type="number" min="0" placeholder="Quantity" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} />
+          <Select value={form.status || "Planned"} onValueChange={status => setForm({ ...form, status })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+          <div><p className="text-sm font-medium">Final invoice</p><p className="text-xs text-muted-foreground">Invoice reference and actual amount are tracked separately from the planned line total.</p></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input placeholder="Invoice reference" value={form.invoiceNumber || ""} onChange={event => setForm({ ...form, invoiceNumber: event.target.value })} />
+            <Input type="number" min="0" placeholder="Invoice / actual amount" value={form.invoiceAmount || ""} onChange={event => setForm({ ...form, invoiceAmount: event.target.value })} />
+          </div>
+          <div className="rounded-md border border-dashed bg-background p-3">
+            <div className="flex items-center gap-2"><UploadCloud className="h-4 w-4 text-primary" /><label htmlFor="invoice-file" className="text-sm font-medium">Invoice PDF</label></div>
+            <input id="invoice-file" type="file" accept="application/pdf,.pdf" className="mt-2 block max-w-full text-xs" onChange={event => setInvoiceFile(event.target.files?.[0] || null)} />
+            <p className="mt-1 text-xs text-muted-foreground">{invoiceFile ? `${invoiceFile.name} will replace the current invoice when you save.` : form.invoiceFileUrl ? "Choose another PDF to replace the attached invoice." : "PDF only, up to 25 MB."}</p>
+            {form.invoiceFileUrl && <a href={form.invoiceFileUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText className="h-3.5 w-3.5" />{form.invoiceFileName || "View current invoice PDF"}</a>}
+          </div>
+        </div>
+      </div>
+    )}
     <DialogFooter><Button variant="outline" onClick={closeDialog}>Cancel</Button><Button disabled={createProject.isPending || createTrade.isPending || saveTask.isPending} onClick={() => dialog === "project" ? createProject.mutate() : dialog === "trade" ? createTrade.mutate() : dialog === "plan" ? submitPlan() : saveTask.mutate()}>{(createProject.isPending || createTrade.isPending || saveTask.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
   </DialogContent></Dialog>
 
@@ -497,6 +589,33 @@ export default function Preparations() {
   <Dialog open={dialog === "import"} onOpenChange={open => !open && closeDialog()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Import maintenance tasks</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Open tasks for {selectedBuilding?.name} are matched to this location. Importing never changes the original maintenance record.</p><div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">{importableTasks.isLoading ? <div className="h-32 animate-pulse rounded-lg bg-muted" /> : importableTasks.data?.length ? importableTasks.data.map(task => <label key={task.id} className="flex cursor-pointer gap-3 rounded-lg border p-3 hover:bg-muted/30"><input type="checkbox" className="mt-1 h-4 w-4" checked={importTaskIds.includes(task.id)} onChange={event => setImportTaskIds(current => event.target.checked ? [...current, task.id] : current.filter(id => id !== task.id))} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{task.title}</p><Badge variant="secondary" className="text-[10px]">{task.priority}</Badge></div><p className="mt-2 text-xs text-muted-foreground">{task.category} · {task.tradeName}{task.assignedGroupName ? ` · source group: ${task.assignedGroupName}` : ""}</p></div></label>) : <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">No open maintenance tasks are available for this location.</div>}</div><DialogFooter><Button variant="outline" onClick={closeDialog}>Cancel</Button><Button disabled={!importTaskIds.length || importTasks.isPending} onClick={() => importTasks.mutate()}>{importTasks.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Import {importTaskIds.length || ""} task{importTaskIds.length === 1 ? "" : "s"}</Button></DialogFooter></DialogContent></Dialog>
 
   <Dialog open={dialog === "quotes"} onOpenChange={open => !open && closeDialog()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle className="flex items-center justify-between gap-3">Quote comparison<Button size="sm" variant="outline" disabled={!quotes.data?.length} onClick={() => { const doc = new jsPDF(); doc.text(`Quote comparison — ${quoteTask?.title || ""}`, 15, 18); (quotes.data || []).forEach((quote, index) => doc.text(`${index + 1}. ${quote.supplierName} — ${money(quote.amount)}`, 15, 32 + index * 8)); doc.save("quote-comparison.pdf"); }}><FileText className="mr-2 h-4 w-4" />Export PDF</Button></DialogTitle></DialogHeader><div className="flex justify-end"><Button size="sm" onClick={() => { setForm({}); setDialog("quote"); }}><Plus className="mr-2 h-4 w-4" />Add quote</Button></div>{quotes.data?.length ? <div className="grid gap-3 sm:grid-cols-2">{quotes.data.map(quote => <div key={quote.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><p className="font-semibold">{quote.supplierName}</p><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteQuote(quote)}><Trash2 className="h-4 w-4" /></Button></div><p className="mt-3 text-2xl font-semibold text-primary">{money(quote.amount)}</p>{quote.fileUrl && <a href={quote.fileUrl} target="_blank" rel="noreferrer" className="mt-2 block text-xs text-primary hover:underline">{quote.fileName || "View attachment"}</a>}</div>)}</div> : <div className="py-10 text-center text-sm text-muted-foreground">No supplier quotes for this line.</div>}</DialogContent></Dialog>
-  <Dialog open={dialog === "quote"} onOpenChange={open => !open && setDialog("quotes")}><DialogContent><DialogHeader><DialogTitle>Add supplier quote</DialogTitle></DialogHeader><div className="space-y-3"><Input placeholder="Supplier name" value={form.supplierName || ""} onChange={event => setForm({ ...form, supplierName: event.target.value })} /><Input type="number" min="0" placeholder="Amount" value={form.amount || ""} onChange={event => setForm({ ...form, amount: event.target.value })} /><div className="rounded-lg border border-dashed p-4"><p className="mb-2 text-sm font-medium">Quote PDF</p><input id="quote-file" type="file" accept="application/pdf" className="block max-w-full text-xs" /></div><Input placeholder="Attachment name (optional)" value={form.fileName || ""} onChange={event => setForm({ ...form, fileName: event.target.value })} /><Input placeholder="Attachment link (optional)" value={form.fileUrl || ""} onChange={event => setForm({ ...form, fileUrl: event.target.value })} /></div><DialogFooter><Button variant="outline" onClick={() => setDialog("quotes")}>Cancel</Button><Button onClick={() => createQuote.mutate()} disabled={createQuote.isPending}>{createQuote.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save quote</Button></DialogFooter></DialogContent></Dialog>
+  <Dialog open={dialog === "quote"} onOpenChange={open => !open && setDialog("quotes")}>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Add supplier quote</DialogTitle></DialogHeader>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Supplier</label>
+          <SupplierSelect
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={form.supplierName || ""}
+            legacyName={form.supplierName}
+            suppliers={supplierCatalog.data || []}
+            pendingLabel="Select a supplier"
+            onChange={supplierName => setForm({ ...form, supplierName })}
+          />
+        </div>
+        <Input type="number" min="0" placeholder="Amount" value={form.amount || ""} onChange={event => setForm({ ...form, amount: event.target.value })} />
+        <div className="rounded-lg border border-dashed p-4"><p className="mb-2 text-sm font-medium">Quote PDF</p><input id="quote-file" type="file" accept="application/pdf" className="block max-w-full text-xs" /></div>
+        <Input placeholder="Attachment name (optional)" value={form.fileName || ""} onChange={event => setForm({ ...form, fileName: event.target.value })} />
+        <Input placeholder="Attachment link (optional)" value={form.fileUrl || ""} onChange={event => setForm({ ...form, fileUrl: event.target.value })} />
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setDialog("quotes")}>Cancel</Button>
+        <Button onClick={() => createQuote.mutate()} disabled={createQuote.isPending}>
+          {createQuote.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save quote
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
   </Layout>;
 }

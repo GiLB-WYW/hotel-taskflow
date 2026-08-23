@@ -15,6 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Location, User, MaintenanceGroup, Category } from "@shared/schema";
 
+type Supplier = {
+  id: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  groupIds: string[];
+};
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("locations");
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +38,7 @@ export default function Admin() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isEditCategoryDialogOpen, setIsEditCategoryDialogOpen] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
@@ -43,6 +52,8 @@ export default function Admin() {
   const [editUserForm, setEditUserForm] = useState({ name: "", email: "", role: "", password: "", groups: [] as string[] });
   const [editCategoryForm, setEditCategoryForm] = useState({ name: "", description: "" });
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "Basic Staff" });
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [supplierForm, setSupplierForm] = useState({ name: "", description: "", isActive: true, groupIds: [] as string[] });
 
   // Fetch data from API
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -55,6 +66,10 @@ export default function Admin() {
 
   const { data: groups = [], isLoading: groupsLoading } = useQuery<MaintenanceGroup[]>({
     queryKey: ["/api/maintenance-groups"],
+  });
+
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
   });
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -150,6 +165,45 @@ export default function Admin() {
         description: "Failed to create maintenance group",
         variant: "destructive",
       });
+    },
+  });
+
+  const saveSupplierMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: supplierForm.name.trim(),
+        description: supplierForm.description.trim() || null,
+        isActive: supplierForm.isActive,
+      };
+      const response = await fetch(editingSupplier ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers", {
+        method: editingSupplier ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to save supplier");
+
+      const groupResponse = await fetch(`/api/suppliers/${data.id}/groups`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupIds: supplierForm.groupIds }),
+        credentials: "include",
+      });
+      const groupData = await groupResponse.json();
+      if (!groupResponse.ok) throw new Error(groupData.error || "Failed to assign maintenance groups");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
+      setIsSupplierDialogOpen(false);
+      setEditingSupplier(null);
+      setSupplierForm({ name: "", description: "", isActive: true, groupIds: [] });
+      toast({ title: "Supplier saved", description: "The supplier catalogue is now updated for Preparations." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not save supplier", description: error.message, variant: "destructive" });
     },
   });
 
@@ -430,6 +484,34 @@ export default function Admin() {
       return;
     }
     createGroupMutation.mutate(newGroup);
+  };
+
+  const openSupplierDialog = (supplier?: Supplier) => {
+    setEditingSupplier(supplier || null);
+    setSupplierForm(supplier ? {
+      name: supplier.name,
+      description: supplier.description || "",
+      isActive: supplier.isActive,
+      groupIds: supplier.groupIds,
+    } : { name: "", description: "", isActive: true, groupIds: [] });
+    setIsSupplierDialogOpen(true);
+  };
+
+  const toggleSupplierGroup = (groupId: string) => {
+    setSupplierForm(current => ({
+      ...current,
+      groupIds: current.groupIds.includes(groupId)
+        ? current.groupIds.filter(id => id !== groupId)
+        : [...current.groupIds, groupId],
+    }));
+  };
+
+  const handleSaveSupplier = () => {
+    if (!supplierForm.name.trim()) {
+      toast({ title: "Supplier name required", description: "Enter a supplier name before saving.", variant: "destructive" });
+      return;
+    }
+    saveSupplierMutation.mutate();
   };
 
   const handleEditUser = (user: User) => {
@@ -1189,15 +1271,25 @@ export default function Admin() {
                     Manage maintenance teams and their specializations.
                   </CardDescription>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setPageLocation("/admin/groups")}
-                  className="gap-2"
-                  data-testid="button-manage-groups"
-                >
-                  <Wrench className="h-4 w-4" />
-                  Manage Groups
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPageLocation("/admin/groups")}
+                    className="gap-2"
+                    data-testid="button-manage-groups"
+                  >
+                    <Wrench className="h-4 w-4" />
+                    Manage Groups
+                  </Button>
+                  <Button
+                    onClick={() => openSupplierDialog()}
+                    className="gap-2"
+                    data-testid="button-add-supplier"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Supplier
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {groupsLoading ? (
@@ -1210,31 +1302,188 @@ export default function Admin() {
                         <TableHead className="min-w-[120px]">Group Name</TableHead>
                         <TableHead className="min-w-[150px]">Description</TableHead>
                         <TableHead className="min-w-[80px]">Members</TableHead>
+                        <TableHead className="min-w-[220px]">Suppliers</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredGroups.map((group) => (
-                        <TableRow key={group.id}>
-                          <TableCell className="font-medium flex items-center gap-2">
-                            <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
-                              <Wrench className="h-4 w-4 text-primary" />
-                            </div>
-                            <span data-testid={`text-group-${group.id}`}>{group.name}</span>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{group.description}</TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/50 text-secondary-foreground">
-                              {group.memberCount} members
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredGroups.map((group) => {
+                        const groupSuppliers = suppliers.filter(supplier => supplier.groupIds.includes(group.id));
+                        return (
+                          <TableRow key={group.id}>
+                            <TableCell className="font-medium flex items-center gap-2">
+                              <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                                <Wrench className="h-4 w-4 text-primary" />
+                              </div>
+                              <span data-testid={`text-group-${group.id}`}>{group.name}</span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{group.description}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/50 text-secondary-foreground">
+                                {group.memberCount} members
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {suppliersLoading ? (
+                                <span className="text-sm text-muted-foreground">Loading…</span>
+                              ) : groupSuppliers.length ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {groupSuppliers.map(supplier => (
+                                    <button
+                                      key={supplier.id}
+                                      type="button"
+                                      onClick={() => openSupplierDialog(supplier)}
+                                      className={`rounded-full border px-2 py-0.5 text-xs hover:bg-muted ${supplier.isActive ? "bg-background" : "border-dashed text-muted-foreground line-through"}`}
+                                      title={`Edit ${supplier.name}`}
+                                    >
+                                      {supplier.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <button type="button" className="text-sm text-primary hover:underline" onClick={() => openSupplierDialog()}>
+                                  Add suppliers
+                                </button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle>Supplier catalogue</CardTitle>
+                <CardDescription>Shared supplier names used by the Preparation register and quote comparisons.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {suppliersLoading ? (
+                  <p className="py-4 text-center text-muted-foreground">Loading suppliers…</p>
+                ) : suppliers.length ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead>Maintenance groups</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {suppliers.map(supplier => (
+                          <TableRow key={supplier.id}>
+                            <TableCell>
+                              <p className="font-medium">{supplier.name}</p>
+                              {supplier.description && <p className="mt-0.5 text-xs text-muted-foreground">{supplier.description}</p>}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {supplier.groupIds.length
+                                ? supplier.groupIds.map(id => groups.find(group => group.id === id)?.name || "Removed group").join(", ")
+                                : "Not assigned"}
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${supplier.isActive ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}>
+                                {supplier.isActive ? "Active" : "Inactive"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button size="icon" variant="ghost" title={`Edit ${supplier.name}`} onClick={() => openSupplierDialog(supplier)} data-testid={`button-edit-supplier-${supplier.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="py-6 text-center">
+                    <p className="text-sm text-muted-foreground">No suppliers have been added yet.</p>
+                    <Button className="mt-3" size="sm" onClick={() => openSupplierDialog()}><Plus className="mr-2 h-4 w-4" />Add your first supplier</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={isSupplierDialogOpen} onOpenChange={(open) => {
+              setIsSupplierDialogOpen(open);
+              if (!open) {
+                setEditingSupplier(null);
+                setSupplierForm({ name: "", description: "", isActive: true, groupIds: [] });
+              }
+            }}>
+              <DialogContent className="max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>{editingSupplier ? "Edit supplier" : "Add supplier"}</DialogTitle>
+                  <DialogDescription>
+                    Assign a supplier to every maintenance group that can use it. Active suppliers appear in the Preparation register.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-name">Supplier name</Label>
+                    <Input
+                      id="supplier-name"
+                      value={supplierForm.name}
+                      onChange={event => setSupplierForm({ ...supplierForm, name: event.target.value })}
+                      placeholder="e.g., CSE Climatisation"
+                      data-testid="input-supplier-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-description">Notes (optional)</Label>
+                    <Input
+                      id="supplier-description"
+                      value={supplierForm.description}
+                      onChange={event => setSupplierForm({ ...supplierForm, description: event.target.value })}
+                      placeholder="Contact or service notes"
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3">
+                    <input
+                      type="checkbox"
+                      checked={supplierForm.isActive}
+                      onChange={event => setSupplierForm({ ...supplierForm, isActive: event.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      data-testid="checkbox-supplier-active"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">Available in Preparations</span>
+                      <span className="block text-xs text-muted-foreground">Turn this off to keep the supplier history without offering it for new selections.</span>
+                    </span>
+                  </label>
+                  <div className="space-y-2">
+                    <Label>Maintenance groups</Label>
+                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                      {groups.length ? groups.map(group => (
+                        <label key={group.id} className="flex cursor-pointer items-center gap-2 rounded p-1 hover:bg-muted/50">
+                          <input
+                            type="checkbox"
+                            checked={supplierForm.groupIds.includes(group.id)}
+                            onChange={() => toggleSupplierGroup(group.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            data-testid={`checkbox-supplier-group-${group.id}`}
+                          />
+                          <span className="text-sm">{group.name}</span>
+                        </label>
+                      )) : <p className="py-2 text-sm text-muted-foreground">Create a maintenance group before assigning suppliers.</p>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">A supplier can be selected for more than one group.</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsSupplierDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSaveSupplier} disabled={saveSupplierMutation.isPending} data-testid="button-save-supplier">
+                    {saveSupplierMutation.isPending ? "Saving…" : "Save supplier"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
 
