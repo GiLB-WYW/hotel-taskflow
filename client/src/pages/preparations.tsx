@@ -111,9 +111,26 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
   const shortLabel = (name: string) => name.includes(' · ') ? name.split(' · ').slice(1).join(' · ') : name;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-sm">
+      <table className="w-full min-w-[620px] table-fixed text-sm">
+        <colgroup>
+          <col className="w-7" />
+          <col />
+          <col className="w-16" />
+          <col className="w-24" />
+          <col className="w-24" />
+          <col className="w-24" />
+          <col className="w-24" />
+        </colgroup>
         <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-          <tr><th className="w-7 pb-2" /><th className="pb-2 font-medium">Group</th><th className="pb-2 text-right font-medium">Lines</th><th className="pb-2 text-right font-medium">Planned</th><th className="pb-2 text-right font-medium">Best quote</th><th className="pb-2 text-right font-medium">Actual</th><th className="pb-2 text-right font-medium">Variance</th></tr>
+          <tr>
+            <th className="pb-2" />
+            <th className="pb-2 font-medium">Group</th>
+            <th className="pb-2 text-right font-medium" title="Number of procurement tasks">Tasks</th>
+            <th className="pb-2 text-right font-medium" title="Total planned budget">Budget</th>
+            <th className="pb-2 text-right font-medium" title="Lowest supplier quote (devis) recorded">Quote (devis)</th>
+            <th className="pb-2 text-right font-medium" title="Total amount on received invoices">Invoiced</th>
+            <th className="pb-2 text-right font-medium" title="Budget minus invoiced amount. A negative value means the group is over budget.">Budget left</th>
+          </tr>
         </thead>
         <tbody>
           {lines.map(line => {
