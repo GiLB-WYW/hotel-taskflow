@@ -1724,7 +1724,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceDocument: "Travaux 2026 - Cahier de charges",
           sourceReference: `travaux-2026:${sourceItem.id}`,
           quantity: sourceItem.quantity,
-          unitPrice: sourceItem.estimatedCost,
           estimatedCost: sourceItem.estimatedCost || "0",
           invoiceNumber: sourceItem.invoiceNumber,
           invoiceAmount: sourceItem.invoiceAmount,
@@ -1907,13 +1906,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const bestQuote = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
         const unitPrice = task.unitPrice === null ? null : Number(task.unitPrice);
         const quantity = task.quantity === null ? null : Number(task.quantity);
-        const lineTotal = unitPrice !== null && quantity !== null ? unitPrice * quantity : Number(task.estimatedCost) || 0;
+        const estimatedCost = Number(task.estimatedCost) || 0;
         const invoiceAmount = task.invoiceAmount === null ? null : Number(task.invoiceAmount);
         return {
           ...task,
           unitPrice,
           quantity,
-          lineTotal,
+          estimatedCost,
           invoiceAmount,
           bestQuote,
           quoteCount: quotes.length,
@@ -1926,7 +1925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const key = keyFor(task);
           const total = totals.get(key) || { estimated: 0, quoted: 0, actual: 0, taskCount: 0 };
           if (task.isActive) {
-            total.estimated += task.lineTotal;
+            total.estimated += task.estimatedCost;
             total.quoted += task.bestQuote;
             total.actual += task.invoiceAmount ?? (Number(task.actualCost) || 0);
           }
@@ -1937,7 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
       const totals = taskRows.reduce((total, task) => task.isActive ? ({
-        estimated: total.estimated + task.lineTotal,
+        estimated: total.estimated + task.estimatedCost,
         quoted: total.quoted + task.bestQuote,
         actual: total.actual + (task.invoiceAmount ?? (Number(task.actualCost) || 0)),
       }) : total, { estimated: 0, quoted: 0, actual: 0 });
@@ -2131,7 +2130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       type TaskSummary = {
         id: string; title: string; description?: string | null; productDescription?: string | null;
         projectId: string; projectName: string; buildingId: string;
-        supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
+        supplierName?: string | null; unitPrice?: number | null; quantity?: number | null;
         estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
         invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
         plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage: boolean; isActive: boolean; tradeId?: string | null;
@@ -2145,9 +2144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const task = projectTasks[index];
         const unitPrice = task.unitPrice === null ? null : Number(task.unitPrice);
         const quantity = task.quantity === null ? null : Number(task.quantity);
-        const estimatedCost = unitPrice !== null && quantity !== null
-          ? unitPrice * quantity
-          : Number(task.estimatedCost) || 0;
+        const estimatedCost = Number(task.estimatedCost) || 0;
         const actualCost = task.invoiceAmount === null
           ? Number(task.actualCost) || 0
           : Number(task.invoiceAmount);
@@ -2170,7 +2167,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           projectId: task.projectId, projectName: projectNames.get(task.projectId) || "Untitled",
           buildingId: buildingId || "",
           supplierName: task.supplierName, unitPrice, quantity,
-          lineTotal: unitPrice !== null && quantity !== null ? unitPrice * quantity : null,
           estimatedCost, actualCost,
           invoiceAmount: task.invoiceAmount === null ? null : Number(task.invoiceAmount),
           invoiceNumber: task.invoiceNumber, invoiceFileUrl: task.invoiceFileUrl,

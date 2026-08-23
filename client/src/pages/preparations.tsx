@@ -23,14 +23,14 @@ type Trade = { id: string; name: string };
 type RegisterTask = {
   id: string; projectId: string; tradeId?: string | null; category: string; sourceTaskId?: string | null; sourceHasImage?: boolean;
   title: string; description?: string | null; productDescription?: string | null; supplierName?: string | null;
-  unitPrice?: number | null; quantity?: number | null; lineTotal?: number; plannedFor?: string | null;
+  unitPrice?: number | null; quantity?: number | null; plannedFor?: string | null;
   sourceDocument?: string | null; invoiceNumber?: string | null; invoiceAmount?: number | null; invoiceFileName?: string | null; invoiceFileUrl?: string | null;
   status?: string; isActive: boolean; estimatedCost?: number; actualCost?: number; bestQuote: number; quoteCount: number;
 };
 type RollupTask = {
   id: string; title: string; description?: string | null; productDescription?: string | null;
   projectId: string; projectName: string; buildingId: string;
-  supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
+  supplierName?: string | null; unitPrice?: number | null; quantity?: number | null;
   estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
   invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
   plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage?: boolean; tradeId?: string | null;
@@ -56,7 +56,7 @@ async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
 function BudgetTable({ lines }: { lines: BudgetLine[] }) {
   if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
   return <div className="overflow-x-auto"><table className="w-full min-w-[540px] text-sm">
-    <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="pb-2 font-medium">Group</th><th className="pb-2 text-right font-medium">Lines</th><th className="pb-2 text-right font-medium">Planned</th><th className="pb-2 text-right font-medium">Best quote</th><th className="pb-2 text-right font-medium">Actual</th><th className="pb-2 text-right font-medium">Variance</th></tr></thead>
+    <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="pb-2 font-medium">Group</th><th className="pb-2 text-right font-medium">Tasks</th><th className="pb-2 text-right font-medium">Budget</th><th className="pb-2 text-right font-medium">Quote</th><th className="pb-2 text-right font-medium">Invoiced</th><th className="pb-2 text-right font-medium">Budget left</th></tr></thead>
     <tbody>{lines.map(line => <tr key={line.name} className="border-b last:border-0"><td className="py-3 font-medium">{line.name}</td><td className="py-3 text-right text-muted-foreground">{line.taskCount}</td><td className="py-3 text-right">{money(line.estimated)}</td><td className="py-3 text-right">{money(line.quoted)}</td><td className="py-3 text-right">{money(line.actual)}</td><td className={`py-3 text-right font-medium ${line.variance < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(line.variance)}</td></tr>)}</tbody>
   </table></div>;
 }
@@ -178,7 +178,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                               <th className="py-2 text-left font-medium">Project</th>
                               <th className="py-2 text-left font-medium">Supplier</th>
                               <th className="py-2 text-center font-medium">Active</th>
-                              <th className="py-2 text-right font-medium">Planned</th>
+                              <th className="py-2 text-right font-medium">Planned budget</th>
                               <th className="py-2 text-left font-medium">Invoice #</th>
                               <th className="py-2 text-right font-medium">Invoice amt</th>
                               <th className="py-2 font-medium" />
@@ -233,7 +233,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                      />
                                    </td>
                                   <td className="py-2 pr-3 text-right">
-                                    {task.lineTotal !== null && task.lineTotal !== undefined ? money(task.lineTotal) : money(task.estimatedCost)}
+                                     {money(task.estimatedCost)}
                                   </td>
                                   <td className="py-2 pr-2">
                                     <input
@@ -453,7 +453,7 @@ export default function Preparations() {
     },
     onSuccess: () => { invalidateRegister(); queryClient.invalidateQueries({ queryKey: ["/api/preparations/quotes"] }); setForm({}); setDialog("quotes"); toast({ title: "Quote added" }); }, onError: (error: Error) => fail(error, "Could not add quote"),
   });
-  const openNewTask = () => { setEditingTask(null); setInvoiceFile(null); setForm({ category: DEFAULT_CATEGORY, status: "Planned", quantity: "1", unitPrice: "", estimatedCost: "0", actualCost: "0", invoiceAmount: "" }); setDialog("task"); };
+  const openNewTask = () => { setEditingTask(null); setInvoiceFile(null); setForm({ category: DEFAULT_CATEGORY, status: "Planned", quantity: "1", unitPrice: "", estimatedCost: "", actualCost: "0", invoiceAmount: "" }); setDialog("task"); };
   const editTask = (task: RegisterTask) => { setEditingTask(task); setInvoiceFile(null); setForm({ title: task.title, description: task.description || "", productDescription: task.productDescription || "", supplierName: task.supplierName || "", category: task.category || DEFAULT_CATEGORY, tradeId: task.tradeId || "", status: task.status || "Planned", plannedFor: task.plannedFor || "", unitPrice: String(task.unitPrice ?? ""), quantity: String(task.quantity ?? ""), estimatedCost: String(task.estimatedCost || 0), invoiceNumber: task.invoiceNumber || "", invoiceAmount: String(task.invoiceAmount ?? ""), invoiceFileName: task.invoiceFileName || "", invoiceFileUrl: task.invoiceFileUrl || "", actualCost: String(task.actualCost || 0) }); setDialog("task"); };
   const commitInline = (task: RegisterTask, field: string, value: string, numeric = false) => {
     const current = String(task[field as keyof RegisterTask] ?? "");
@@ -469,14 +469,14 @@ export default function Preparations() {
 
     {!projectId ? <Card className="flex min-h-[330px] items-center justify-center border-dashed"><div className="text-center"><ClipboardList className="mx-auto h-10 w-10 text-primary/40" /><h2 className="mt-3 font-serif text-xl font-semibold">Choose a project to begin</h2><p className="mt-1 text-sm text-muted-foreground">Select a location and its project, or create a new project.</p></div></Card> : <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-serif text-2xl font-semibold">{selectedProject?.name}</h2><p className="mt-1 text-sm text-muted-foreground">{selectedBuilding?.name} · {selectedProject?.description || "Structured procurement register"}</p></div><Badge className="bg-primary/10 text-primary hover:bg-primary/10">{selectedProject?.status || "Planning"}</Badge></div>
-      <div className="grid gap-3 sm:grid-cols-4"><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Planned</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.estimated)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Best quotes</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.quoted)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Actual / invoices</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.actual)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Variance</p><p className={`mt-1 text-xl font-semibold ${(register.data?.totals.variance || 0) < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(register.data?.totals.variance)}</p></CardContent></Card></div>
+      <div className="grid gap-3 sm:grid-cols-4"><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Planned budget</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.estimated)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Best quotes</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.quoted)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Actual / invoices</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.actual)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Budget left</p><p className={`mt-1 text-xl font-semibold ${(register.data?.totals.variance || 0) < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(register.data?.totals.variance)}</p></CardContent></Card></div>
       <Tabs defaultValue="register"><TabsList className="w-full justify-start overflow-x-auto"><TabsTrigger value="register"><ClipboardList className="mr-2 h-4 w-4" />Register</TabsTrigger><TabsTrigger value="budget"><Calculator className="mr-2 h-4 w-4" />Budget</TabsTrigger><TabsTrigger value="plans"><FileText className="mr-2 h-4 w-4" />Executive plans</TabsTrigger></TabsList>
       <TabsContent value="register" className="mt-4">
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-base">Procurement lines</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Click into supplier, product, unit price, quantity, timing, or status to save a line directly. Inactive lines are kept for reference but excluded from costs.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Planned budget is independent from product unit price and quantity. Click into a field to save it directly. Inactive lines are kept for reference but excluded from costs.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => { setScopeIds([]); setDialog("scope"); }}><FileText className="mr-2 h-4 w-4" />2026 works PDF</Button>
@@ -487,9 +487,9 @@ export default function Preparations() {
           <CardContent>
             {register.isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : register.isError ? <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">The register could not be loaded. <Button variant="link" onClick={() => register.refetch()}>Retry</Button></div> : register.data?.tasks.length ? (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1580px] text-sm">
+                <table className="w-full min-w-[1640px] text-sm">
                   <thead className="border-y bg-muted/20 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <tr><th className="px-3 py-3 font-medium">Task</th><th className="px-3 py-3 text-center font-medium">Active</th><th className="px-3 py-3 font-medium">Category / trade</th><th className="px-3 py-3 font-medium">Product description</th><th className="px-3 py-3 font-medium">Supplier</th><th className="px-3 py-3 text-right font-medium">Unit price</th><th className="px-3 py-3 text-right font-medium">Qty</th><th className="px-3 py-3 text-right font-medium">Total price</th><th className="px-3 py-3 font-medium">Timing / status</th><th className="px-3 py-3 font-medium">Invoice</th><th className="px-3 py-3 text-right font-medium">Actual</th><th className="px-3 py-3" /></tr>
+                    <tr><th className="px-3 py-3 font-medium">Task</th><th className="px-3 py-3 text-center font-medium">Active</th><th className="px-3 py-3 font-medium">Category / trade</th><th className="px-3 py-3 font-medium">Product description</th><th className="px-3 py-3 font-medium">Supplier</th><th className="px-3 py-3 text-right font-medium">Planned budget</th><th className="px-3 py-3 text-right font-medium">Unit price</th><th className="px-3 py-3 text-right font-medium">Qty</th><th className="px-3 py-3 font-medium">Timing / status</th><th className="px-3 py-3 font-medium">Invoice</th><th className="px-3 py-3 text-right font-medium">Actual</th><th className="px-3 py-3" /></tr>
                   </thead>
                   <tbody>
                     {register.data.tasks.map(task => (
@@ -520,9 +520,9 @@ export default function Preparations() {
                             onChange={supplierName => patchTask.mutate({ id: task.id, data: { supplierName: supplierName || null } })}
                           />
                         </td>
+                        <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-28 text-right font-semibold" defaultValue={task.estimatedCost ?? ""} onBlur={event => commitInline(task, "estimatedCost", event.target.value, true)} /></td>
                         <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.unitPrice ?? ""} onBlur={event => commitInline(task, "unitPrice", event.target.value, true)} /></td>
                         <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-16 text-right" defaultValue={task.quantity ?? ""} onBlur={event => commitInline(task, "quantity", event.target.value, true)} /></td>
-                        <td className="px-3 py-3 text-right font-semibold">{task.unitPrice !== null && task.quantity !== null ? money(task.lineTotal) : "Pending"}</td>
                         <td className="px-3 py-3"><Input className="mb-1 h-8 min-w-[108px]" defaultValue={task.plannedFor || ""} placeholder="Month / date" onBlur={event => commitInline(task, "plannedFor", event.target.value)} /><Select value={task.status || "Planned"} onValueChange={status => patchTask.mutate({ id: task.id, data: { status } })}><SelectTrigger className="h-8 min-w-[108px] text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent></Select></td>
                         <td className="px-3 py-3"><Input className="h-8 min-w-[120px]" defaultValue={task.invoiceNumber || ""} placeholder="Invoice reference" onBlur={event => commitInline(task, "invoiceNumber", event.target.value)} />{task.invoiceFileUrl && <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" className="mt-2 flex max-w-[180px] items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{task.invoiceFileName || "View invoice PDF"}</span></a>}</td>
                         <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.invoiceAmount ?? task.actualCost ?? ""} onBlur={event => commitInline(task, "invoiceAmount", event.target.value, true)} /></td>
@@ -541,7 +541,7 @@ export default function Preparations() {
       </Tabs>
     </div>}
 
-    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Planned procurement values use unit price × quantity when both are available.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0, lineTotal: task.lineTotal ?? undefined } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card></div></details></CardContent></Card>}
+    {rollups.data && <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio rollup</p><p className="mt-1 text-sm text-muted-foreground">Portfolio budgets use each line’s planned budget, independently from product pricing and quantity.</p></div><div className="flex gap-6 text-right"><div><p className="text-xs text-muted-foreground">Planned budget</p><p className="font-semibold">{money(rollups.data.grandTotal.estimated)}</p></div><div><p className="text-xs text-muted-foreground">Quotes</p><p className="font-semibold">{money(rollups.data.grandTotal.quoted)}</p></div><div><p className="text-xs text-muted-foreground">Actual</p><p className="font-semibold">{money(rollups.data.grandTotal.actual)}</p></div></div></div><details className="mt-5"><summary className="cursor-pointer text-sm font-medium text-primary">View portfolio budgets by project, category, and trade</summary><div className="mt-4 space-y-4"><Card><CardHeader><CardTitle className="text-sm">Projects</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.projects || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0 } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Categories</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.categories || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0 } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Trades</CardTitle></CardHeader><CardContent><ExpandableBudgetTable lines={rollups.data.trades || []} onPatch={(id, data) => patchTask.mutate({ id, data })} onEdit={task => editTask({ id: task.id, projectId: task.projectId, title: task.title, description: task.description, productDescription: task.productDescription, supplierName: task.supplierName, category: task.category, tradeId: task.tradeId, status: task.status, unitPrice: task.unitPrice, quantity: task.quantity, plannedFor: task.plannedFor, estimatedCost: task.estimatedCost, invoiceNumber: task.invoiceNumber, invoiceAmount: task.invoiceAmount, invoiceFileName: task.invoiceFileName, invoiceFileUrl: task.invoiceFileUrl, actualCost: task.actualCost, sourceTaskId: task.sourceTaskId, bestQuote: 0, quoteCount: 0 } as RegisterTask)} projects={rollupProjects} suppliers={supplierCatalog.data || []} /></CardContent></Card></div></details></CardContent></Card>}
   </div>
 
   <Dialog open={!!dialog && ["project", "trade", "task", "plan"].includes(dialog)} onOpenChange={open => !open && closeDialog()}><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto"><DialogHeader><DialogTitle>{dialog === "project" ? "New preparation project" : dialog === "trade" ? "Add trade" : dialog === "plan" ? "Attach executive plan" : editingTask ? "Edit procurement line" : "Add procurement line"}</DialogTitle></DialogHeader>
@@ -577,15 +577,28 @@ export default function Preparations() {
             <SelectContent><SelectItem value="none">Unassigned</SelectItem>{trades.data?.map(trade => <SelectItem key={trade.id} value={trade.id}>{trade.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Unit price</label>
-            <Input type="number" min="0" placeholder="Enter price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} />
+        <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/[0.035] p-4">
+          <div>
+            <p className="text-sm font-medium">Planned budget</p>
+            <p className="text-xs text-muted-foreground">This amount drives project and portfolio budgets. It does not change when product price or quantity changes.</p>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Quantity</label>
-            <Input type="number" min="0" placeholder="Enter quantity" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Planned budget</label>
+              <Input type="number" min="0" placeholder="Enter budget" value={form.estimatedCost || ""} onChange={event => setForm({ ...form, estimatedCost: event.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Unit price</label>
+              <Input type="number" min="0" placeholder="Product price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Quantity</label>
+              <Input type="number" min="0" placeholder="Number of items" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} />
+            </div>
           </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Status</label>
           <Select value={form.status || "Planned"} onValueChange={status => setForm({ ...form, status })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent>
