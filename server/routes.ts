@@ -1769,6 +1769,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.listTrades(),
       ]);
       const allQuotes = await Promise.all(projectTasks.map(task => storage.listQuotes(task.id)));
+      const sourceTaskIds = Array.from(new Set(projectTasks.map(task => task.sourceTaskId).filter((id): id is string => Boolean(id))));
+      const sourceTasks = await Promise.all(sourceTaskIds.map(id => storage.getTask(id)));
+      const sourceHasImage = new Map<string, boolean>();
+      for (const sourceTask of sourceTasks) {
+        if (sourceTask) sourceHasImage.set(sourceTask.id, Boolean(sourceTask.imageUrl));
+      }
       const taskRows = projectTasks.map((task, index) => {
         const quotes = allQuotes[index];
         const bestQuote = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
@@ -1776,7 +1782,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quantity = task.quantity === null ? null : Number(task.quantity);
         const lineTotal = unitPrice !== null && quantity !== null ? unitPrice * quantity : Number(task.estimatedCost) || 0;
         const invoiceAmount = task.invoiceAmount === null ? null : Number(task.invoiceAmount);
-        return { ...task, unitPrice, quantity, lineTotal, invoiceAmount, bestQuote, quoteCount: quotes.length };
+        return {
+          ...task,
+          unitPrice,
+          quantity,
+          lineTotal,
+          invoiceAmount,
+          bestQuote,
+          quoteCount: quotes.length,
+          sourceHasImage: task.sourceTaskId ? sourceHasImage.get(task.sourceTaskId) || false : false,
+        };
       });
       const summarize = (keyFor: (task: typeof taskRows[number]) => string) => {
         const totals = new Map<string, { estimated: number; quoted: number; actual: number; taskCount: number }>();
@@ -1964,6 +1979,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.listTrades(),
       ]);
       const allQuotes = await Promise.all(projectTasks.map(task => storage.listQuotes(task.id)));
+      const sourceTaskIds = Array.from(new Set(projectTasks.map(task => task.sourceTaskId).filter((id): id is string => Boolean(id))));
+      const sourceTasks = await Promise.all(sourceTaskIds.map(id => storage.getTask(id)));
+      const sourceHasImage = new Map<string, boolean>();
+      for (const sourceTask of sourceTasks) {
+        if (sourceTask) sourceHasImage.set(sourceTask.id, Boolean(sourceTask.imageUrl));
+      }
       const projectBuilding = new Map(projects.map(project => [project.id, project.buildingId]));
       const projectNames = new Map(projects.map(project => [project.id, project.name]));
       const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
@@ -1987,7 +2008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
         estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
         invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
-        plannedFor?: string | null; sourceTaskId?: string | null; tradeId?: string | null;
+        plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage: boolean; tradeId?: string | null;
         category: string; status?: string | null;
       };
       const categoryTasks = new Map<string, TaskSummary[]>();
@@ -2028,7 +2049,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invoiceAmount: task.invoiceAmount === null ? null : Number(task.invoiceAmount),
           invoiceNumber: task.invoiceNumber, invoiceFileUrl: task.invoiceFileUrl,
           invoiceFileName: task.invoiceFileName, plannedFor: task.plannedFor,
-          sourceTaskId: task.sourceTaskId, tradeId: task.tradeId, category: catKey, status: task.status,
+          sourceTaskId: task.sourceTaskId,
+          sourceHasImage: task.sourceTaskId ? sourceHasImage.get(task.sourceTaskId) || false : false,
+          tradeId: task.tradeId, category: catKey, status: task.status,
         };
         if (!categoryTasks.has(catKey)) categoryTasks.set(catKey, []);
         categoryTasks.get(catKey)!.push(summary);
