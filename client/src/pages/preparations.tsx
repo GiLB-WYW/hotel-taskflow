@@ -559,8 +559,14 @@ export default function Preparations() {
           </Select>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Input type="number" min="0" placeholder="Unit price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} />
-          <Input type="number" min="0" placeholder="Quantity" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Unit price</label>
+            <Input type="number" min="0" placeholder="Enter price" value={form.unitPrice || ""} onChange={event => setForm({ ...form, unitPrice: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Quantity</label>
+            <Input type="number" min="0" placeholder="Enter quantity" value={form.quantity || ""} onChange={event => setForm({ ...form, quantity: event.target.value })} />
+          </div>
           <Select value={form.status || "Planned"} onValueChange={status => setForm({ ...form, status })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent>
