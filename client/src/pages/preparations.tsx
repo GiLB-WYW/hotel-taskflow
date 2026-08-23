@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import { Calculator, ChevronDown, ChevronRight, ClipboardList, FileText, FolderInput, ImageIcon, Loader2, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, UploadCloud, Users } from "lucide-react";
+import { Calculator, ChevronDown, ChevronRight, CircleHelp, ClipboardList, FileText, FolderInput, ImageIcon, Loader2, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, UploadCloud, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 
 type Location = { id: string; name: string; category: string; code: string };
@@ -129,7 +130,27 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
             <th className="pb-2 text-right font-medium" title="Total planned budget">Budget</th>
             <th className="pb-2 text-right font-medium" title="Lowest supplier quote (devis) recorded">Quote (devis)</th>
             <th className="pb-2 text-right font-medium" title="Total amount on received invoices">Invoiced</th>
-            <th className="pb-2 text-right font-medium" title="Budget minus invoiced amount. A negative value means the group is over budget.">Budget left</th>
+            <th className="pb-2 text-right font-medium">
+              <span className="inline-flex items-center gap-1">
+                Budget left
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="rounded text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary" aria-label="Explain budget summary">
+                        <CircleHelp className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="end" className="max-w-xs space-y-1.5 p-3 text-left leading-relaxed">
+                      <p><strong>Tasks:</strong> number of procurement tasks.</p>
+                      <p><strong>Budget:</strong> total planned amount.</p>
+                      <p><strong>Quote (devis):</strong> lowest supplier quotation recorded.</p>
+                      <p><strong>Invoiced:</strong> total final-invoice amount received.</p>
+                      <p><strong>Budget left:</strong> budget minus invoiced amount. A negative value means over budget.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
