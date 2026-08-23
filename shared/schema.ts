@@ -168,6 +168,7 @@ export const projectTasksTable = pgTable("project_tasks", {
   invoiceFileName: text("invoice_file_name"),
   invoiceFileUrl: text("invoice_file_url"),
   status: varchar("status").notNull().default("Planned"),
+  isActive: boolean("is_active").notNull().default(true),
   estimatedCost: numeric("estimated_cost", { precision: 12, scale: 2 }).notNull().default("0"),
   actualCost: numeric("actual_cost", { precision: 12, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),

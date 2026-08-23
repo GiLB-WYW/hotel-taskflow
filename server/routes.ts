@@ -1798,20 +1798,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const task of taskRows) {
           const key = keyFor(task);
           const total = totals.get(key) || { estimated: 0, quoted: 0, actual: 0, taskCount: 0 };
-          total.estimated += task.lineTotal;
-          total.quoted += task.bestQuote;
-          total.actual += task.invoiceAmount ?? (Number(task.actualCost) || 0);
+          if (task.isActive) {
+            total.estimated += task.lineTotal;
+            total.quoted += task.bestQuote;
+            total.actual += task.invoiceAmount ?? (Number(task.actualCost) || 0);
+          }
           total.taskCount += 1;
           totals.set(key, total);
         }
         return Array.from(totals, ([name, total]) => ({ name, ...total, variance: total.estimated - total.actual }));
       };
       const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
-      const totals = taskRows.reduce((total, task) => ({
+      const totals = taskRows.reduce((total, task) => task.isActive ? ({
         estimated: total.estimated + task.lineTotal,
         quoted: total.quoted + task.bestQuote,
         actual: total.actual + (task.invoiceAmount ?? (Number(task.actualCost) || 0)),
-      }), { estimated: 0, quoted: 0, actual: 0 });
+      }) : total, { estimated: 0, quoted: 0, actual: 0 });
       res.json({
         tasks: taskRows,
         totals: { ...totals, variance: totals.estimated - totals.actual },
@@ -2008,7 +2010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierName?: string | null; unitPrice?: number | null; quantity?: number | null; lineTotal?: number | null;
         estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
         invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
-        plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage: boolean; tradeId?: string | null;
+        plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage: boolean; isActive: boolean; tradeId?: string | null;
         category: string; status?: string | null;
       };
       const categoryTasks = new Map<string, TaskSummary[]>();
@@ -2027,10 +2029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : Number(task.invoiceAmount);
         const quotes = allQuotes[index];
         const quotedCost = quotes.length ? Math.min(...quotes.map(quote => Number(quote.amount) || 0)) : 0;
-        const costs = { estimated: estimatedCost, quoted: quotedCost, actual: actualCost };
-        grandTotal.estimated += estimatedCost;
-        grandTotal.quoted += quotedCost;
-        grandTotal.actual += actualCost;
+        const costs = task.isActive ? { estimated: estimatedCost, quoted: quotedCost, actual: actualCost } : { estimated: 0, quoted: 0, actual: 0 };
+        grandTotal.estimated += costs.estimated;
+        grandTotal.quoted += costs.quoted;
+        grandTotal.actual += costs.actual;
         const buildingId = projectBuilding.get(task.projectId);
         if (buildingId) addTo(buildingTotals, buildingId, costs);
         addTo(projectTotals, task.projectId, costs);
@@ -2051,6 +2053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invoiceFileName: task.invoiceFileName, plannedFor: task.plannedFor,
           sourceTaskId: task.sourceTaskId,
           sourceHasImage: task.sourceTaskId ? sourceHasImage.get(task.sourceTaskId) || false : false,
+          isActive: task.isActive,
           tradeId: task.tradeId, category: catKey, status: task.status,
         };
         if (!categoryTasks.has(catKey)) categoryTasks.set(catKey, []);

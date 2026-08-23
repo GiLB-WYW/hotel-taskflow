@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 type Location = { id: string; name: string; category: string; code: string };
@@ -23,7 +24,7 @@ type RegisterTask = {
   title: string; description?: string | null; productDescription?: string | null; supplierName?: string | null;
   unitPrice?: number | null; quantity?: number | null; lineTotal?: number; plannedFor?: string | null;
   sourceDocument?: string | null; invoiceNumber?: string | null; invoiceAmount?: number | null; invoiceFileName?: string | null; invoiceFileUrl?: string | null;
-  status?: string; estimatedCost?: number; actualCost?: number; bestQuote: number; quoteCount: number;
+  status?: string; isActive: boolean; estimatedCost?: number; actualCost?: number; bestQuote: number; quoteCount: number;
 };
 type RollupTask = {
   id: string; title: string; description?: string | null; productDescription?: string | null;
@@ -32,7 +33,7 @@ type RollupTask = {
   estimatedCost: number; actualCost: number; invoiceAmount?: number | null;
   invoiceNumber?: string | null; invoiceFileUrl?: string | null; invoiceFileName?: string | null;
   plannedFor?: string | null; sourceTaskId?: string | null; sourceHasImage?: boolean; tradeId?: string | null;
-  category: string; status?: string | null;
+  category: string; status?: string | null; isActive: boolean;
 };
 type BudgetLine = { name: string; estimated: number; quoted: number; actual: number; variance: number; taskCount: number; tasks?: RollupTask[] };
 type Register = { tasks: RegisterTask[]; totals: Omit<BudgetLine, "name" | "taskCount">; categories: BudgetLine[]; trades: BudgetLine[] };
@@ -103,6 +104,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                               <th className="py-2 text-left font-medium">Task</th>
                               <th className="py-2 text-left font-medium">Project</th>
                               <th className="py-2 text-left font-medium">Supplier</th>
+                              <th className="py-2 text-center font-medium">Active</th>
                               <th className="py-2 text-right font-medium">Planned</th>
                               <th className="py-2 text-left font-medium">Invoice #</th>
                               <th className="py-2 text-right font-medium">Invoice amt</th>
@@ -114,7 +116,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                               const taskSupplier = task.supplierName ?? "";
                               const hasUnknownSupplier = taskSupplier && !suppliers.includes(taskSupplier);
                               return (
-                                <tr key={task.id} className="border-b last:border-0">
+                                <tr key={task.id} className={`border-b last:border-0 ${task.isActive ? "" : "bg-muted/30 text-muted-foreground"}`}>
                                   <td className="py-2 pr-3">
                                     <div className="flex max-w-[200px] flex-wrap items-center gap-1">
                                       {task.sourceTaskId && task.sourceHasImage && (
@@ -171,6 +173,13 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                       {hasUnknownSupplier && <option value={taskSupplier}>{taskSupplier}</option>}
                                     </select>
                                   </td>
+                                   <td className="py-2 pr-2 text-center">
+                                     <Switch
+                                       checked={task.isActive}
+                                       onCheckedChange={isActive => onPatch(task.id, { isActive })}
+                                       aria-label={`${task.isActive ? "Deactivate" : "Activate"} ${task.title}`}
+                                     />
+                                   </td>
                                   <td className="py-2 pr-3 text-right">
                                     {task.lineTotal !== null && task.lineTotal !== undefined ? money(task.lineTotal) : money(task.estimatedCost)}
                                   </td>
@@ -410,7 +419,63 @@ export default function Preparations() {
       <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-serif text-2xl font-semibold">{selectedProject?.name}</h2><p className="mt-1 text-sm text-muted-foreground">{selectedBuilding?.name} · {selectedProject?.description || "Structured procurement register"}</p></div><Badge className="bg-primary/10 text-primary hover:bg-primary/10">{selectedProject?.status || "Planning"}</Badge></div>
       <div className="grid gap-3 sm:grid-cols-4"><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Planned</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.estimated)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Best quotes</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.quoted)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Actual / invoices</p><p className="mt-1 text-xl font-semibold">{money(register.data?.totals.actual)}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-xs uppercase tracking-wider text-muted-foreground">Variance</p><p className={`mt-1 text-xl font-semibold ${(register.data?.totals.variance || 0) < 0 ? "text-destructive" : "text-emerald-700"}`}>{money(register.data?.totals.variance)}</p></CardContent></Card></div>
       <Tabs defaultValue="register"><TabsList className="w-full justify-start overflow-x-auto"><TabsTrigger value="register"><ClipboardList className="mr-2 h-4 w-4" />Register</TabsTrigger><TabsTrigger value="budget"><Calculator className="mr-2 h-4 w-4" />Budget</TabsTrigger><TabsTrigger value="plans"><FileText className="mr-2 h-4 w-4" />Executive plans</TabsTrigger></TabsList>
-      <TabsContent value="register" className="mt-4"><Card><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-base">Procurement lines</CardTitle><p className="mt-1 text-sm text-muted-foreground">Click into supplier, product, unit price, quantity, timing, or status to save a line directly.</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setScopeIds([]); setDialog("scope"); }}><FileText className="mr-2 h-4 w-4" />2026 works PDF</Button><Button size="sm" variant="outline" onClick={() => { setImportTaskIds([]); setDialog("import"); }}><FolderInput className="mr-2 h-4 w-4" />Import this location</Button><Button size="sm" onClick={openNewTask}><Plus className="mr-2 h-4 w-4" />Add line</Button></div></CardHeader><CardContent>{register.isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : register.isError ? <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">The register could not be loaded. <Button variant="link" onClick={() => register.refetch()}>Retry</Button></div> : register.data?.tasks.length ? <div className="overflow-x-auto"><table className="w-full min-w-[1480px] text-sm"><thead className="border-y bg-muted/20 text-left text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-3 py-3 font-medium">Task</th><th className="px-3 py-3 font-medium">Category / trade</th><th className="px-3 py-3 font-medium">Product description</th><th className="px-3 py-3 font-medium">Supplier</th><th className="px-3 py-3 text-right font-medium">Unit price</th><th className="px-3 py-3 text-right font-medium">Qty</th><th className="px-3 py-3 text-right font-medium">Total price</th><th className="px-3 py-3 font-medium">Timing / status</th><th className="px-3 py-3 font-medium">Invoice</th><th className="px-3 py-3 text-right font-medium">Actual</th><th className="px-3 py-3" /></tr></thead><tbody>{register.data.tasks.map(task => <tr key={task.id} className="border-b align-top last:border-0"><td className="px-3 py-3"><div className="flex items-center gap-2">{task.sourceTaskId && task.sourceHasImage && <button type="button" title="View task photo and edit line" onClick={() => editTask(task)} className="shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-primary"><img src={`/api/tasks/${task.sourceTaskId}/thumbnail`} alt="" className="h-10 w-10 object-cover" /></button>}<span className="max-w-[220px] font-medium">{task.title}</span>{task.sourceTaskId && <Badge variant="outline" className="text-[10px]">App task</Badge>}{task.sourceDocument?.includes("Travaux") && <Badge variant="outline" className="text-[10px]">PDF</Badge>}</div>{task.description && <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">{task.description}</p>}</td><td className="px-3 py-3 text-xs"><p>{task.category}</p><p className="mt-1 text-muted-foreground">{trades.data?.find(trade => trade.id === task.tradeId)?.name || "Unassigned"}</p></td><td className="px-3 py-3"><Input className="h-8 min-w-[170px]" defaultValue={task.productDescription || ""} placeholder="Not specified" onBlur={event => commitInline(task, "productDescription", event.target.value)} /></td><td className="px-3 py-3"><Input className="h-8 min-w-[150px]" defaultValue={task.supplierName || ""} placeholder="Pending" onBlur={event => commitInline(task, "supplierName", event.target.value)} /></td><td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.unitPrice ?? ""} onBlur={event => commitInline(task, "unitPrice", event.target.value, true)} /></td><td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-16 text-right" defaultValue={task.quantity ?? ""} onBlur={event => commitInline(task, "quantity", event.target.value, true)} /></td><td className="px-3 py-3 text-right font-semibold">{task.unitPrice !== null && task.quantity !== null ? money(task.lineTotal) : "Pending"}</td><td className="px-3 py-3"><Input className="mb-1 h-8 min-w-[108px]" defaultValue={task.plannedFor || ""} placeholder="Month / date" onBlur={event => commitInline(task, "plannedFor", event.target.value)} /><Select value={task.status || "Planned"} onValueChange={status => patchTask.mutate({ id: task.id, data: { status } })}><SelectTrigger className="h-8 min-w-[108px] text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent></Select></td><td className="px-3 py-3"><Input className="h-8 min-w-[120px]" defaultValue={task.invoiceNumber || ""} placeholder="Invoice reference" onBlur={event => commitInline(task, "invoiceNumber", event.target.value)} />{task.invoiceFileUrl && <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" className="mt-2 flex max-w-[180px] items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{task.invoiceFileName || "View invoice PDF"}</span></a>}</td><td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.invoiceAmount ?? task.actualCost ?? ""} onBlur={event => commitInline(task, "invoiceAmount", event.target.value, true)} /></td><td className="px-3 py-3"><div className="flex gap-1"><Button size="icon" variant="ghost" title="Edit line and invoice PDF" onClick={() => editTask(task)}><Pencil className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => { setQuoteTask(task); setDialog("quotes"); }}>Quotes</Button>{!task.sourceTaskId && <Button size="icon" variant="ghost" className="text-destructive" title="Delete line" onClick={() => deleteTask(task)}><Trash2 className="h-4 w-4" /></Button>}</div></td></tr>)}</tbody></table></div> : <div className="py-14 text-center"><ClipboardList className="mx-auto h-9 w-9 text-primary/35" /><p className="mt-3 font-medium">Your procurement register is empty</p><p className="mt-1 text-sm text-muted-foreground">Add a line, bring in eligible PDF scope, or import maintenance work already logged for {selectedBuilding?.name}.</p><div className="mt-4 flex justify-center gap-2"><Button variant="outline" onClick={() => { setScopeIds([]); setDialog("scope"); }}>Review 2026 works PDF</Button><Button onClick={openNewTask}><Plus className="mr-2 h-4 w-4" />Add line</Button></div></div>}</CardContent></Card></TabsContent>
+      <TabsContent value="register" className="mt-4">
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Procurement lines</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Click into supplier, product, unit price, quantity, timing, or status to save a line directly. Inactive lines are kept for reference but excluded from costs.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setScopeIds([]); setDialog("scope"); }}><FileText className="mr-2 h-4 w-4" />2026 works PDF</Button>
+              <Button size="sm" variant="outline" onClick={() => { setImportTaskIds([]); setDialog("import"); }}><FolderInput className="mr-2 h-4 w-4" />Import this location</Button>
+              <Button size="sm" onClick={openNewTask}><Plus className="mr-2 h-4 w-4" />Add line</Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {register.isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : register.isError ? <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">The register could not be loaded. <Button variant="link" onClick={() => register.refetch()}>Retry</Button></div> : register.data?.tasks.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1580px] text-sm">
+                  <thead className="border-y bg-muted/20 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr><th className="px-3 py-3 font-medium">Task</th><th className="px-3 py-3 text-center font-medium">Active</th><th className="px-3 py-3 font-medium">Category / trade</th><th className="px-3 py-3 font-medium">Product description</th><th className="px-3 py-3 font-medium">Supplier</th><th className="px-3 py-3 text-right font-medium">Unit price</th><th className="px-3 py-3 text-right font-medium">Qty</th><th className="px-3 py-3 text-right font-medium">Total price</th><th className="px-3 py-3 font-medium">Timing / status</th><th className="px-3 py-3 font-medium">Invoice</th><th className="px-3 py-3 text-right font-medium">Actual</th><th className="px-3 py-3" /></tr>
+                  </thead>
+                  <tbody>
+                    {register.data.tasks.map(task => (
+                      <tr key={task.id} className={`border-b align-top last:border-0 ${task.isActive ? "" : "bg-muted/30 text-muted-foreground"}`}>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            {task.sourceTaskId && task.sourceHasImage && <button type="button" title="View task photo and edit line" onClick={() => editTask(task)} className="shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-primary"><img src={`/api/tasks/${task.sourceTaskId}/thumbnail`} alt="" className="h-10 w-10 object-cover" /></button>}
+                            <span className="max-w-[220px] font-medium">{task.title}</span>
+                            {task.sourceTaskId && <Badge variant="outline" className="text-[10px]">App task</Badge>}
+                            {task.sourceDocument?.includes("Travaux") && <Badge variant="outline" className="text-[10px]">PDF</Badge>}
+                          </div>
+                          {task.description && <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">{task.description}</p>}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <Switch checked={task.isActive} onCheckedChange={isActive => patchTask.mutate({ id: task.id, data: { isActive } })} aria-label={`${task.isActive ? "Deactivate" : "Activate"} ${task.title}`} />
+                            <span className="text-[10px]">{task.isActive ? "Active" : "Inactive"}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-xs"><p>{task.category}</p><p className="mt-1 text-muted-foreground">{trades.data?.find(trade => trade.id === task.tradeId)?.name || "Unassigned"}</p></td>
+                        <td className="px-3 py-3"><Input className="h-8 min-w-[170px]" defaultValue={task.productDescription || ""} placeholder="Not specified" onBlur={event => commitInline(task, "productDescription", event.target.value)} /></td>
+                        <td className="px-3 py-3"><Input className="h-8 min-w-[150px]" defaultValue={task.supplierName || ""} placeholder="Pending" onBlur={event => commitInline(task, "supplierName", event.target.value)} /></td>
+                        <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.unitPrice ?? ""} onBlur={event => commitInline(task, "unitPrice", event.target.value, true)} /></td>
+                        <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-16 text-right" defaultValue={task.quantity ?? ""} onBlur={event => commitInline(task, "quantity", event.target.value, true)} /></td>
+                        <td className="px-3 py-3 text-right font-semibold">{task.unitPrice !== null && task.quantity !== null ? money(task.lineTotal) : "Pending"}</td>
+                        <td className="px-3 py-3"><Input className="mb-1 h-8 min-w-[108px]" defaultValue={task.plannedFor || ""} placeholder="Month / date" onBlur={event => commitInline(task, "plannedFor", event.target.value)} /><Select value={task.status || "Planned"} onValueChange={status => patchTask.mutate({ id: task.id, data: { status } })}><SelectTrigger className="h-8 min-w-[108px] text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Planned">Planned</SelectItem><SelectItem value="In progress">In progress</SelectItem><SelectItem value="Complete">Complete</SelectItem><SelectItem value="On hold">On hold</SelectItem></SelectContent></Select></td>
+                        <td className="px-3 py-3"><Input className="h-8 min-w-[120px]" defaultValue={task.invoiceNumber || ""} placeholder="Invoice reference" onBlur={event => commitInline(task, "invoiceNumber", event.target.value)} />{task.invoiceFileUrl && <a href={task.invoiceFileUrl} target="_blank" rel="noreferrer" className="mt-2 flex max-w-[180px] items-center gap-1 text-xs font-medium text-primary hover:underline"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{task.invoiceFileName || "View invoice PDF"}</span></a>}</td>
+                        <td className="px-3 py-3"><Input type="number" min="0" className="h-8 w-24 text-right" defaultValue={task.invoiceAmount ?? task.actualCost ?? ""} onBlur={event => commitInline(task, "invoiceAmount", event.target.value, true)} /></td>
+                        <td className="px-3 py-3"><div className="flex gap-1"><Button size="icon" variant="ghost" title="Edit line and invoice PDF" onClick={() => editTask(task)}><Pencil className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => { setQuoteTask(task); setDialog("quotes"); }}>Quotes</Button>{!task.sourceTaskId && <Button size="icon" variant="ghost" className="text-destructive" title="Delete line" onClick={() => deleteTask(task)}><Trash2 className="h-4 w-4" /></Button>}</div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <div className="py-14 text-center"><ClipboardList className="mx-auto h-9 w-9 text-primary/35" /><p className="mt-3 font-medium">Your procurement register is empty</p><p className="mt-1 text-sm text-muted-foreground">Add a line, bring in eligible PDF scope, or import maintenance work already logged for {selectedBuilding?.name}.</p><div className="mt-4 flex justify-center gap-2"><Button variant="outline" onClick={() => { setScopeIds([]); setDialog("scope"); }}>Review 2026 works PDF</Button><Button onClick={openNewTask}><Plus className="mr-2 h-4 w-4" />Add line</Button></div></div>}
+          </CardContent>
+        </Card>
+      </TabsContent>
         <TabsContent value="budget" className="mt-4"><div className="grid gap-4 xl:grid-cols-2"><Card><CardHeader><CardTitle className="text-base">Budget by category</CardTitle></CardHeader><CardContent><BudgetTable lines={register.data?.categories || []} /></CardContent></Card><Card><CardHeader><CardTitle className="text-base">Budget by trade</CardTitle></CardHeader><CardContent><BudgetTable lines={register.data?.trades || []} /></CardContent></Card></div></TabsContent>
         <TabsContent value="plans" className="mt-4"><Card><CardHeader className="flex flex-row items-center justify-between"><CardTitle className="text-base">Executive-plan PDFs</CardTitle><Button size="sm" onClick={() => setDialog("plan")}><UploadCloud className="mr-2 h-4 w-4" />Attach plan</Button></CardHeader><CardContent>{plans.data?.length ? <div className="space-y-2">{plans.data.map(plan => <div key={plan.id} className="flex items-center justify-between rounded-lg border p-3"><a href={plan.fileUrl} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-3 text-sm font-medium text-primary hover:underline"><FileText className="h-5 w-5 shrink-0" /><span className="truncate">{plan.fileName}</span></a><Button size="icon" variant="ghost" className="text-destructive" onClick={() => deletePlan(plan)}><Trash2 className="h-4 w-4" /></Button></div>)}</div> : <div className="py-10 text-center text-sm text-muted-foreground">No executive plan attached to this project.</div>}</CardContent></Card></TabsContent>
       </Tabs>
