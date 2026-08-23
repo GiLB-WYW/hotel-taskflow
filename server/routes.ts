@@ -1988,9 +1988,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!await requirePreparationAccess(req, res)) return;
       const existingTask = await storage.getProjectTask(req.params.id);
       if (!existingTask) return res.status(404).json({ error: "Project task not found." });
-      if (existingTask.sourceTaskId && req.body.projectId && req.body.projectId !== existingTask.projectId) {
-        return res.status(400).json({ error: "Imported maintenance tasks cannot be moved to another project." });
-      }
       if (req.body.projectId && !await storage.getProject(req.body.projectId)) {
         return res.status(404).json({ error: "Project not found." });
       }
