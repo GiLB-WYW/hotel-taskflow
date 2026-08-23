@@ -104,6 +104,7 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
   suppliers: PreparationSupplier[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [pendingProject, setPendingProject] = useState<{ taskId: string; projectId: string; projectName: string } | null>(null);
   if (!lines.length) return <p className="py-4 text-sm text-muted-foreground">No budget entries yet.</p>;
   const toggle = (name: string) => setExpanded(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
   const selectCls = "h-7 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
@@ -202,19 +203,39 @@ function ExpandableBudgetTable({ lines, onPatch, onEdit, projects, suppliers }: 
                                     {task.plannedFor && <p className="mt-0.5 text-muted-foreground">{task.plannedFor}</p>}
                                   </td>
                                   <td className="py-2 pr-2">
-                                    <select
-                                      className={`${selectCls} w-44`}
-                                      value={task.projectId}
-                                      title="Choose a project. Changes are saved immediately."
-                                      onChange={event => {
-                                        if (event.target.value !== task.projectId) onPatch(task.id, { projectId: event.target.value });
-                                      }}
-                                    >
-                                      {!projects.some(project => project.id === task.projectId) && (
-                                        <option value={task.projectId}>{shortLabel(task.projectName)}</option>
-                                      )}
-                                      {projects.map(project => <option key={project.id} value={project.id}>{shortLabel(project.name)}</option>)}
-                                    </select>
+                                    {(() => {
+                                      const hasPendingProject = pendingProject?.taskId === task.id;
+                                      const selectedProjectId = hasPendingProject ? pendingProject.projectId : task.projectId;
+                                      return (
+                                        <div className="flex flex-col gap-1">
+                                          <select
+                                            className={`${selectCls} w-44`}
+                                            value={selectedProjectId}
+                                            title="Choose a destination project, then save to confirm the move."
+                                            onChange={event => {
+                                              if (event.target.value === task.projectId) {
+                                                setPendingProject(null);
+                                                return;
+                                              }
+                                              const chosenProject = projects.find(project => project.id === event.target.value);
+                                              if (chosenProject) setPendingProject({ taskId: task.id, projectId: chosenProject.id, projectName: chosenProject.name });
+                                            }}
+                                          >
+                                            {!projects.some(project => project.id === task.projectId) && (
+                                              <option value={task.projectId}>{shortLabel(task.projectName)}</option>
+                                            )}
+                                            {projects.map(project => <option key={project.id} value={project.id}>{shortLabel(project.name)}</option>)}
+                                          </select>
+                                          {hasPendingProject && (
+                                            <div className="flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[10px] ring-1 ring-amber-200">
+                                              <span className="text-amber-800">Move to <strong>{shortLabel(pendingProject.projectName)}</strong>?</span>
+                                              <button type="button" className="ml-auto rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted" onClick={() => setPendingProject(null)}>Cancel</button>
+                                              <button type="button" className="rounded bg-primary px-1.5 py-0.5 text-primary-foreground hover:bg-primary/90" onClick={() => { onPatch(task.id, { projectId: pendingProject.projectId }); setPendingProject(null); }}>Save</button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </td>
                                   <td className="py-2 pr-2">
                                     <SupplierSelect
