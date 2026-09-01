@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ExternalLink, Globe, Mail, Pencil, Phone, Plus, Search, Tag } from "lucide-react";
+import { Building2, Globe, Mail, Pencil, Phone, Plus, Search, Tag, UserRound } from "lucide-react";
 import { getAuthUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { Trade } from "@shared/schema";
@@ -17,6 +17,7 @@ import type { Trade } from "@shared/schema";
 type Supplier = {
   id: string;
   name: string;
+  contactPerson?: string | null;
   description?: string | null;
   mobilePhone?: string | null;
   email?: string | null;
@@ -30,6 +31,7 @@ type Supplier = {
 
 type SupplierForm = {
   name: string;
+  contactPerson: string;
   mobilePhone: string;
   email: string;
   website: string;
@@ -40,6 +42,7 @@ type SupplierForm = {
 
 const emptyForm: SupplierForm = {
   name: "",
+  contactPerson: "",
   mobilePhone: "",
   email: "",
   website: "",
@@ -69,7 +72,7 @@ export default function Suppliers() {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return suppliers;
     return suppliers.filter(supplier =>
-      [supplier.name, supplier.email, supplier.mobilePhone, supplier.siret, ...supplier.categories]
+      [supplier.name, supplier.contactPerson, supplier.email, supplier.mobilePhone, supplier.siret, ...supplier.categories]
         .some(value => value?.toLowerCase().includes(query)),
     );
   }, [searchQuery, suppliers]);
@@ -78,6 +81,7 @@ export default function Suppliers() {
     mutationFn: async () => {
       const payload = {
         name: form.name.trim(),
+        contactPerson: form.contactPerson.trim() || null,
         mobilePhone: form.mobilePhone.trim() || null,
         email: form.email.trim() || null,
         website: form.website.trim() || null,
@@ -124,6 +128,7 @@ export default function Suppliers() {
     setEditingSupplier(supplier || null);
     setForm(supplier ? {
       name: supplier.name,
+      contactPerson: supplier.contactPerson || "",
       mobilePhone: supplier.mobilePhone || "",
       email: supplier.email || "",
       website: supplier.website || "",
@@ -198,6 +203,7 @@ export default function Suppliers() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <CardTitle className="text-xl">{supplier.name}</CardTitle>
+                      {supplier.contactPerson && <CardDescription className="mt-1 flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{supplier.contactPerson}</CardDescription>}
                       {supplier.siret && <CardDescription className="mt-1">SIRET {supplier.siret}</CardDescription>}
                     </div>
                     {isAdmin && (
@@ -247,8 +253,12 @@ export default function Suppliers() {
             </DialogHeader>
             <div className="grid gap-4 py-2 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="directory-supplier-name">Supplier name</Label>
+                <Label htmlFor="directory-supplier-name">Company name</Label>
                 <Input id="directory-supplier-name" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="e.g. CSE Climatisation" />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="directory-supplier-contact">Contact person</Label>
+                <Input id="directory-supplier-contact" value={form.contactPerson} onChange={event => setForm({ ...form, contactPerson: event.target.value })} placeholder="e.g. Kevin Martin" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="directory-supplier-phone">Mobile phone</Label>
@@ -291,7 +301,7 @@ export default function Suppliers() {
               <Button variant="outline" onClick={closeDialog}>Cancel</Button>
               <Button onClick={() => {
                 if (!form.name.trim()) {
-                  toast({ title: "Supplier name required", description: "Enter a supplier name before saving.", variant: "destructive" });
+                  toast({ title: "Company name required", description: "Enter a company name before saving.", variant: "destructive" });
                   return;
                 }
                 saveMutation.mutate();

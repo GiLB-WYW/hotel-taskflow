@@ -18,6 +18,7 @@ import type { Location, User, MaintenanceGroup, Category } from "@shared/schema"
 type Supplier = {
   id: string;
   name: string;
+  contactPerson?: string | null;
   description?: string | null;
   isActive: boolean;
   groupIds: string[];
@@ -53,7 +54,7 @@ export default function Admin() {
   const [editCategoryForm, setEditCategoryForm] = useState({ name: "", description: "" });
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "Basic Staff" });
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [supplierForm, setSupplierForm] = useState({ name: "", description: "", isActive: true, groupIds: [] as string[] });
+  const [supplierForm, setSupplierForm] = useState({ name: "", contactPerson: "", description: "", isActive: true, groupIds: [] as string[] });
 
   // Fetch data from API
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -172,6 +173,7 @@ export default function Admin() {
     mutationFn: async () => {
       const payload = {
         name: supplierForm.name.trim(),
+        contactPerson: supplierForm.contactPerson.trim() || null,
         description: supplierForm.description.trim() || null,
         isActive: supplierForm.isActive,
       };
@@ -199,7 +201,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance-groups"] });
       setIsSupplierDialogOpen(false);
       setEditingSupplier(null);
-      setSupplierForm({ name: "", description: "", isActive: true, groupIds: [] });
+      setSupplierForm({ name: "", contactPerson: "", description: "", isActive: true, groupIds: [] });
       toast({ title: "Supplier saved", description: "The supplier catalogue is now updated for Preparations." });
     },
     onError: (error: Error) => {
@@ -490,10 +492,11 @@ export default function Admin() {
     setEditingSupplier(supplier || null);
     setSupplierForm(supplier ? {
       name: supplier.name,
+      contactPerson: supplier.contactPerson || "",
       description: supplier.description || "",
       isActive: supplier.isActive,
       groupIds: supplier.groupIds,
-    } : { name: "", description: "", isActive: true, groupIds: [] });
+    } : { name: "", contactPerson: "", description: "", isActive: true, groupIds: [] });
     setIsSupplierDialogOpen(true);
   };
 
@@ -508,7 +511,7 @@ export default function Admin() {
 
   const handleSaveSupplier = () => {
     if (!supplierForm.name.trim()) {
-      toast({ title: "Supplier name required", description: "Enter a supplier name before saving.", variant: "destructive" });
+      toast({ title: "Company name required", description: "Enter a company name before saving.", variant: "destructive" });
       return;
     }
     saveSupplierMutation.mutate();
@@ -1382,7 +1385,8 @@ export default function Admin() {
                               {supplier.description && <p className="mt-0.5 text-xs text-muted-foreground">{supplier.description}</p>}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {supplier.groupIds.length
+                                {supplier.contactPerson && <span className="block text-xs text-muted-foreground">{supplier.contactPerson}</span>}
+                                {supplier.groupIds.length
                                 ? supplier.groupIds.map(id => groups.find(group => group.id === id)?.name || "Removed group").join(", ")
                                 : "Not assigned"}
                             </TableCell>
@@ -1414,7 +1418,7 @@ export default function Admin() {
               setIsSupplierDialogOpen(open);
               if (!open) {
                 setEditingSupplier(null);
-                setSupplierForm({ name: "", description: "", isActive: true, groupIds: [] });
+                setSupplierForm({ name: "", contactPerson: "", description: "", isActive: true, groupIds: [] });
               }
             }}>
               <DialogContent className="max-w-xl">
@@ -1426,13 +1430,22 @@ export default function Admin() {
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                   <div className="space-y-2">
-                    <Label htmlFor="supplier-name">Supplier name</Label>
+                    <Label htmlFor="supplier-name">Company name</Label>
                     <Input
                       id="supplier-name"
                       value={supplierForm.name}
                       onChange={event => setSupplierForm({ ...supplierForm, name: event.target.value })}
                       placeholder="e.g., CSE Climatisation"
                       data-testid="input-supplier-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-contact-person">Contact person</Label>
+                    <Input
+                      id="supplier-contact-person"
+                      value={supplierForm.contactPerson}
+                      onChange={event => setSupplierForm({ ...supplierForm, contactPerson: event.target.value })}
+                      placeholder="e.g., Kevin Martin"
                     />
                   </div>
                   <div className="space-y-2">

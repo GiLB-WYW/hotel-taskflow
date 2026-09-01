@@ -47,6 +47,7 @@ export const maintenanceGroupsTable = pgTable("maintenance_groups", {
 export const suppliersTable = pgTable("suppliers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
+  contactPerson: text("contact_person"),
   description: text("description"),
   mobilePhone: text("mobile_phone"),
   email: text("email"),
