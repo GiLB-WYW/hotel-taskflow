@@ -48,6 +48,10 @@ export const suppliersTable = pgTable("suppliers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   description: text("description"),
+  mobilePhone: text("mobile_phone"),
+  email: text("email"),
+  website: text("website"),
+  siret: text("siret"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -165,6 +169,16 @@ export const tradesTable = pgTable("trades", {
   description: text("description"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
+
+// A supplier can cover multiple preparation trades/categories.
+export const supplierTradesTable = pgTable("supplier_trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  supplierId: varchar("supplier_id").notNull().references(() => suppliersTable.id, { onDelete: "cascade" }),
+  tradeId: varchar("trade_id").notNull().references(() => tradesTable.id, { onDelete: "cascade" }),
+}, (table) => ({
+  supplierTradeUnique: uniqueIndex("supplier_trades_supplier_trade_unique")
+    .on(table.supplierId, table.tradeId),
+}));
 
 export const projectTasksTable = pgTable("project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -299,6 +313,7 @@ export type Location = typeof locationsTable.$inferSelect;
 export type MaintenanceGroup = typeof maintenanceGroupsTable.$inferSelect;
 export type Supplier = typeof suppliersTable.$inferSelect;
 export type MaintenanceGroupSupplier = typeof maintenanceGroupSuppliersTable.$inferSelect;
+export type SupplierTrade = typeof supplierTradesTable.$inferSelect;
 export type Task = typeof tasksTable.$inferSelect;
 export type Note = typeof notesTable.$inferSelect;
 export type Invitation = typeof invitationsTable.$inferSelect;

@@ -12,7 +12,8 @@ import {
   FileText,
   ShoppingCart,
   Wrench,
-  ClipboardPenLine
+  ClipboardPenLine,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,6 +43,7 @@ export function Layout({ children, userRole = "Manager" }: LayoutProps) {
     { href: "/activity-log", label: "Activity Log", icon: FileText },
     { href: "/smtr", label: "SMTR", icon: Wrench, hide: (authUser?.role || userRole) !== "Admin" },
     { href: "/preparations", label: "Preparations", icon: ClipboardPenLine, hide: !["Admin", "Coordinator"].includes(authUser?.role || userRole) },
+    { href: "/suppliers", label: "Suppliers", icon: Building2 },
     { href: "/admin", label: "Admin", icon: Settings, hide: userRole === "Basic Staff" || userRole === "Personnel" },
   ];
 

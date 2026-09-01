@@ -149,6 +149,15 @@ async function requireAdminAccess(req: Request, res: Response) {
   return user;
 }
 
+async function requireAuthenticatedAccess(req: Request, res: Response) {
+  const user = await getSessionUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Please sign in to access this directory." });
+    return null;
+  }
+  return user;
+}
+
 async function requireTaskManagementAccess(req: Request, res: Response) {
   const user = await getSessionUser(req);
   if (!user || !hasTaskManagementAccess(user.role)) {
@@ -1395,22 +1404,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Supplier catalogue — Admin controls names and group assignment; Preparations reads it below.
+  // Supplier directory — everyone authenticated can read it; only Admins can edit it.
   app.get("/api/suppliers", async (req, res) => {
     try {
-      if (!await requireAdminAccess(req, res)) return;
-      const [suppliers, links] = await Promise.all([
+      if (!await requireAuthenticatedAccess(req, res)) return;
+      const [suppliers, groupLinks, tradeLinks, trades, groups] = await Promise.all([
         storage.listSuppliers(),
         storage.listMaintenanceGroupSupplierLinks(),
+        storage.listSupplierTradeLinks(),
+        storage.listTrades(),
+        storage.listMaintenanceGroups(),
       ]);
+      const tradeNames = new Map(trades.map(trade => [trade.id, trade.name]));
+      const groupNames = new Map(groups.map(group => [group.id, group.name]));
       res.json(suppliers.map(supplier => ({
         ...supplier,
-        groupIds: links
+        groupIds: groupLinks
           .filter(link => link.supplierId === supplier.id)
           .map(link => link.maintenanceGroupId),
+        groupNames: groupLinks
+          .filter(link => link.supplierId === supplier.id)
+          .map(link => groupNames.get(link.maintenanceGroupId))
+          .filter((name): name is string => Boolean(name))
+          .sort((a, b) => a.localeCompare(b)),
+        tradeIds: tradeLinks
+          .filter(link => link.supplierId === supplier.id)
+          .map(link => link.tradeId),
+        categories: tradeLinks
+          .filter(link => link.supplierId === supplier.id)
+          .map(link => tradeNames.get(link.tradeId))
+          .filter((name): name is string => Boolean(name))
+          .sort((a, b) => a.localeCompare(b)),
       })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch suppliers." });
+    }
+  });
+
+  app.get("/api/supplier-categories", async (req, res) => {
+    try {
+      if (!await requireAuthenticatedAccess(req, res)) return;
+      res.json(await storage.listTrades());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch supplier categories." });
     }
   });
 
@@ -1467,6 +1503,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
       res.status(500).json({ error: "Failed to update supplier groups." });
+    }
+  });
+
+  app.put("/api/suppliers/:id/categories", async (req, res) => {
+    try {
+      if (!await requireAdminAccess(req, res)) return;
+      if (!await storage.getSupplier(req.params.id)) {
+        return res.status(404).json({ error: "Supplier not found." });
+      }
+      const { categoryIds } = z.object({ categoryIds: z.array(z.string()).max(200) }).parse(req.body);
+      const uniqueCategoryIds = Array.from(new Set(categoryIds));
+      const categories = await storage.listTrades();
+      if (uniqueCategoryIds.some(id => !categories.some(category => category.id === id))) {
+        return res.status(400).json({ error: "One or more supplier categories no longer exist." });
+      }
+      await storage.setSupplierTrades(req.params.id, uniqueCategoryIds);
+      res.json({ categoryIds: uniqueCategoryIds });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to update supplier categories." });
     }
   });
 

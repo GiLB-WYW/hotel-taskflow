@@ -43,6 +43,13 @@
       "when": 1787324400000,
       "tag": "0005_separate_planned_budget",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787328000000,
+      "tag": "0006_supplier_directory",
+      "breakpoints": true
     }
   ]
 }

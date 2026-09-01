@@ -11,6 +11,7 @@ import {
   type Supplier,
   type InsertSupplier,
   type MaintenanceGroupSupplier,
+  type SupplierTrade,
   type Task,
   type InsertTask,
   type Note,
@@ -39,6 +40,7 @@ import {
   maintenanceGroupsTable,
   suppliersTable,
   maintenanceGroupSuppliersTable,
+  supplierTradesTable,
   tasksTable,
   notesTable,
   invitationsTable,
@@ -116,6 +118,8 @@ export interface IStorage {
   listMaintenanceGroupSupplierLinks(): Promise<MaintenanceGroupSupplier[]>;
   setMaintenanceGroupSuppliers(groupId: string, supplierIds: string[]): Promise<void>;
   setSupplierMaintenanceGroups(supplierId: string, groupIds: string[]): Promise<void>;
+  listSupplierTradeLinks(): Promise<SupplierTrade[]>;
+  setSupplierTrades(supplierId: string, tradeIds: string[]): Promise<void>;
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
@@ -423,6 +427,23 @@ export class PostgresStorage implements IStorage {
       if (uniqueGroupIds.length) {
         await tx.insert(maintenanceGroupSuppliersTable).values(
           uniqueGroupIds.map(maintenanceGroupId => ({ maintenanceGroupId, supplierId })),
+        );
+      }
+    });
+  }
+
+  async listSupplierTradeLinks(): Promise<SupplierTrade[]> {
+    return await db.select().from(supplierTradesTable);
+  }
+
+  async setSupplierTrades(supplierId: string, tradeIds: string[]): Promise<void> {
+    const uniqueTradeIds = Array.from(new Set(tradeIds));
+    await db.transaction(async (tx) => {
+      await tx.delete(supplierTradesTable)
+        .where(eq(supplierTradesTable.supplierId, supplierId));
+      if (uniqueTradeIds.length) {
+        await tx.insert(supplierTradesTable).values(
+          uniqueTradeIds.map(tradeId => ({ supplierId, tradeId })),
         );
       }
     });
