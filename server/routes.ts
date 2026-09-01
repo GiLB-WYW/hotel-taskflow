@@ -1437,6 +1437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .sort((a, b) => a.localeCompare(b)),
       })));
     } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
       res.status(500).json({ error: "Failed to fetch suppliers." });
     }
   });
@@ -1461,6 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(await storage.createSupplier({ ...data, name }));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      console.error("Failed to create supplier:", error);
       res.status(500).json({ error: "Failed to create supplier." });
     }
   });
@@ -1482,6 +1484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(await storage.updateSupplier(existing.id, { ...data, ...(name ? { name } : {}) }));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      console.error("Failed to update supplier:", error);
       res.status(500).json({ error: "Failed to update supplier." });
     }
   });
