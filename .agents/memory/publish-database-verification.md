@@ -8,3 +8,9 @@ Confirm schema changes through Replit’s managed development-database query pat
 **Why:** A successful local migration command can use a separately configured database URL. In that case, the app’s migration appears successful while Replit’s development and production schema comparison still sees neither the new table nor a pending diff.
 
 **How to apply:** After database schema work, query the managed development database for the expected tables or columns and inspect the development-to-production schema diff. Publish only after that diff contains the intended, non-destructive changes.
+
+For schema additions used by critical read paths, keep the application backward-compatible during rollout when practical.
+
+**Why:** A publish can deploy application code while the detected production schema diff remains unapplied. Code that immediately selects a new column can then make intact production data appear empty.
+
+**How to apply:** Detect the additive column or table capability and use the previous schema as a temporary read/write fallback. Show API failures as errors rather than empty datasets.

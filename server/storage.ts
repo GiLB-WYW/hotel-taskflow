@@ -69,9 +69,24 @@ import {
   insertProjectTaskSchema,
   insertQuoteSchema,
 } from "@shared/schema";
-import { eq, and, or, gte, lte, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, sql, inArray, getTableColumns } from "drizzle-orm";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
+
+const { assignedGroups: _assignedGroupsColumn, ...legacyTaskColumns } = getTableColumns(tasksTable);
+const legacyTaskSelection = {
+  ...legacyTaskColumns,
+  assignedGroups: sql<string[] | null>`
+    CASE
+      WHEN ${tasksTable.assignedGroup} IS NULL OR btrim(${tasksTable.assignedGroup}) = '' THEN NULL
+      ELSE ARRAY[${tasksTable.assignedGroup}]::text[]
+    END
+  `.as("assigned_groups"),
+};
+
+function isUndefinedTableError(error: unknown): error is { code: string } {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "42P01";
+}
 
 const SALT_ROUNDS = 10;
 
@@ -201,6 +216,23 @@ export interface IStorage {
 }
 
 export class PostgresStorage implements IStorage {
+  private assignedGroupsColumnAvailable?: Promise<boolean>;
+
+  private hasAssignedGroupsColumn(): Promise<boolean> {
+    if (!this.assignedGroupsColumnAvailable) {
+      this.assignedGroupsColumnAvailable = db.execute<{ exists: boolean }>(sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'tasks'
+            AND column_name = 'assigned_groups'
+        ) AS "exists"
+      `).then(result => Boolean(result.rows[0]?.exists));
+    }
+    return this.assignedGroupsColumnAvailable;
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const user = await db.select().from(usersTable).where(eq(usersTable.id, id));
     return user[0];
@@ -403,7 +435,12 @@ export class PostgresStorage implements IStorage {
   }
 
   async listMaintenanceGroupSupplierLinks(): Promise<MaintenanceGroupSupplier[]> {
-    return await db.select().from(maintenanceGroupSuppliersTable);
+    try {
+      return await db.select().from(maintenanceGroupSuppliersTable);
+    } catch (error) {
+      if (isUndefinedTableError(error)) return [];
+      throw error;
+    }
   }
 
   async setMaintenanceGroupSuppliers(groupId: string, supplierIds: string[]): Promise<void> {
@@ -450,22 +487,50 @@ export class PostgresStorage implements IStorage {
   }
 
   async getTask(id: string): Promise<Task | undefined> {
-    const task = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+    if (await this.hasAssignedGroupsColumn()) {
+      const task = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+      return task[0];
+    }
+    const task = await db.select(legacyTaskSelection).from(tasksTable).where(eq(tasksTable.id, id));
     return task[0];
   }
 
   async createTask(data: InsertTask): Promise<Task> {
     const validated = insertTaskSchema.parse(data);
-    const task = await db.insert(tasksTable).values(validated).returning();
-    return task[0];
+    if (await this.hasAssignedGroupsColumn()) {
+      const task = await db.insert(tasksTable).values(validated).returning();
+      return task[0];
+    }
+    const { assignedGroups, ...legacyValues } = validated;
+    const inserted = await db.insert(tasksTable)
+      .values({
+        ...legacyValues,
+        assignedGroup: legacyValues.assignedGroup || assignedGroups?.[0] || null,
+      })
+      .returning({ id: tasksTable.id });
+    return (await this.getTask(inserted[0].id))!;
   }
 
   async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task> {
-    const task = await db.update(tasksTable)
-      .set({ ...updates, updatedAt: new Date() })
+    if (await this.hasAssignedGroupsColumn()) {
+      const task = await db.update(tasksTable)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(tasksTable.id, id))
+        .returning();
+      return task[0];
+    }
+    const { assignedGroups, ...legacyUpdates } = updates;
+    const updated = await db.update(tasksTable)
+      .set({
+        ...legacyUpdates,
+        ...(assignedGroups !== undefined
+          ? { assignedGroup: legacyUpdates.assignedGroup || assignedGroups?.[0] || null }
+          : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(tasksTable.id, id))
-      .returning();
-    return task[0];
+      .returning({ id: tasksTable.id });
+    return (await this.getTask(updated[0].id))!;
   }
 
   async deleteTask(id: string): Promise<void> {
@@ -481,6 +546,7 @@ export class PostgresStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<Task[]> {
+    const hasAssignedGroups = await this.hasAssignedGroupsColumn();
     const conditions = [];
     if (filters?.locationId) {
       conditions.push(eq(tasksTable.locationId, filters.locationId));
@@ -492,10 +558,12 @@ export class PostgresStorage implements IStorage {
       conditions.push(eq(tasksTable.assignedGroup, filters.assignedGroup));
     }
     if (filters?.assignedGroups) {
-      conditions.push(or(
-        sql`${filters.assignedGroups} = ANY(${tasksTable.assignedGroups})`,
-        eq(tasksTable.assignedGroup, filters.assignedGroups),
-      )!);
+      conditions.push(hasAssignedGroups
+        ? or(
+            sql`${filters.assignedGroups} = ANY(${tasksTable.assignedGroups})`,
+            eq(tasksTable.assignedGroup, filters.assignedGroups),
+          )!
+        : eq(tasksTable.assignedGroup, filters.assignedGroups));
     }
     if (filters?.startDate) {
       conditions.push(gte(tasksTable.createdAt, filters.startDate));
@@ -504,18 +572,27 @@ export class PostgresStorage implements IStorage {
       conditions.push(lte(tasksTable.createdAt, filters.endDate));
     }
 
+    if (hasAssignedGroups) {
+      if (conditions.length > 0) {
+        return await db.select()
+          .from(tasksTable)
+          .where(and(...conditions))
+          .orderBy(desc(tasksTable.createdAt));
+      }
+      return await db.select()
+        .from(tasksTable)
+        .orderBy(desc(tasksTable.createdAt));
+    }
+
     if (conditions.length > 0) {
-      const tasks = await db.select()
+      return await db.select(legacyTaskSelection)
         .from(tasksTable)
         .where(and(...conditions))
         .orderBy(desc(tasksTable.createdAt));
-      return tasks;
     }
-
-    const tasks = await db.select()
+    return await db.select(legacyTaskSelection)
       .from(tasksTable)
       .orderBy(desc(tasksTable.createdAt));
-    return tasks;
   }
 
   async listTasksByLocation(locationId: string, startDate?: Date, endDate?: Date): Promise<Task[]> {
@@ -693,12 +770,18 @@ export class PostgresStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return await db.select().from(tasksTable)
-      .where(and(
-        eq(tasksTable.status, "Resolved"),
-        gte(tasksTable.updatedAt, startOfDay),
-        lte(tasksTable.updatedAt, endOfDay)
-      ))
+    const conditions = and(
+      eq(tasksTable.status, "Resolved"),
+      gte(tasksTable.updatedAt, startOfDay),
+      lte(tasksTable.updatedAt, endOfDay)
+    );
+    if (await this.hasAssignedGroupsColumn()) {
+      return await db.select().from(tasksTable)
+        .where(conditions)
+        .orderBy(desc(tasksTable.updatedAt));
+    }
+    return await db.select(legacyTaskSelection).from(tasksTable)
+      .where(conditions)
       .orderBy(desc(tasksTable.updatedAt));
   }
 
