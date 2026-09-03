@@ -1,2 +1,3 @@
 - [Planned budget separation](planned-budget-separation.md) — project budgets must remain independent from product unit price and quantity.
 - [Supplier category source](supplier-category-source.md) — supplier categories reuse Preparation trades through a many-to-many mapping.
+- [Publish database verification](publish-database-verification.md) — verify schema in Replit’s managed development DB; local migration commands may target another configured URL.
