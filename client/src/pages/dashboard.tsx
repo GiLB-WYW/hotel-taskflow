@@ -111,7 +111,13 @@ export default function Dashboard() {
   }, []);
 
   // Fetch tasks from API
-  const { data: allTasks = [], isLoading } = useQuery<Task[]>({
+  const {
+    data: allTasks = [],
+    isLoading,
+    isError: isTasksError,
+    error: tasksError,
+    refetch: refetchTasks,
+  } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
   });
 
@@ -372,6 +378,29 @@ export default function Dashboard() {
       <Layout>
         <div className="flex items-center justify-center min-h-[400px]">
           <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isTasksError) {
+    return (
+      <Layout>
+        <div className="flex min-h-[400px] items-center justify-center px-4">
+          <div className="w-full max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-destructive" />
+            <h2 className="text-xl font-semibold text-foreground">Tasks could not be loaded</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your task data has not been removed. The server could not read it from the database.
+            </p>
+            <p className="mt-2 break-words text-xs text-muted-foreground">
+              {tasksError instanceof Error ? tasksError.message : "Unknown server error"}
+            </p>
+            <Button className="mt-5" onClick={() => refetchTasks()}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Try again
+            </Button>
+          </div>
         </div>
       </Layout>
     );
