@@ -2498,7 +2498,16 @@ ${content}`;
   // Generate daily resolved tasks summary for Activity Log
   app.post("/api/activity-log/generate-daily-summary", async (req, res) => {
     try {
+      // Summaries are written to the shared activity log and include task
+      // titles and locations, so only roles with organization-wide task
+      // visibility may generate them.
+      const actor = await requirePreparationAccess(req, res);
+      if (!actor) return;
+
       const targetDate = req.body.date ? new Date(req.body.date) : new Date();
+      if (Number.isNaN(targetDate.getTime())) {
+        return res.status(400).json({ error: "A valid summary date is required." });
+      }
       
       // Get all resolved tasks for that day
       const resolvedTasks = await storage.getResolvedTasksForDate(targetDate);
