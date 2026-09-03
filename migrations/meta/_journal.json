@@ -57,6 +57,13 @@
       "when": 1787331600000,
       "tag": "0007_supplier_contact_person",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788422400000,
+      "tag": "0008_task_multiple_groups",
+      "breakpoints": true
     }
   ]
 }

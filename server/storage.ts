@@ -69,7 +69,7 @@ import {
   insertProjectTaskSchema,
   insertQuoteSchema,
 } from "@shared/schema";
-import { eq, and, gte, lte, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, sql, inArray } from "drizzle-orm";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 
@@ -492,7 +492,10 @@ export class PostgresStorage implements IStorage {
       conditions.push(eq(tasksTable.assignedGroup, filters.assignedGroup));
     }
     if (filters?.assignedGroups) {
-      conditions.push(sql`${filters.assignedGroups} = ANY(${tasksTable.assignedGroups})`);
+      conditions.push(or(
+        sql`${filters.assignedGroups} = ANY(${tasksTable.assignedGroups})`,
+        eq(tasksTable.assignedGroup, filters.assignedGroups),
+      )!);
     }
     if (filters?.startDate) {
       conditions.push(gte(tasksTable.createdAt, filters.startDate));
